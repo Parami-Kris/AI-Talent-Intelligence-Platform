@@ -1,0 +1,278 @@
+{
+    "name": "Parami Krishnamurthy",
+    "email": "paramikris@gmail.com",
+    "phone": "+91 9940084228",
+    "linkedin": [
+        "https://www.linkedin.com/in/parami-kris/"
+    ],
+    "github": [
+        "https://parami-kris.github.io/"
+    ],
+    "raw_skills": [
+        "Python",
+        "HTML",
+        "CSS",
+        "TensorFlow",
+        "RestAPI",
+        "ReactJS(basic)",
+        "JavaScript(basic)",
+        "Machine Learning",
+        "Deep Learning",
+        "Natural Language Processing",
+        "LLM",
+        "Autoencoders",
+        "Computer Vision (YOLO)",
+        "Time Series (LSTM)",
+        "Attention Mechanism",
+        "Prompt Engineering",
+        "Data Visualization",
+        "Data mining",
+        "Langchain",
+        "MySQL",
+        "Power BI",
+        "Git",
+        "KNIME",
+        "UiPath-Robotic Process Automation(RPA)",
+        "AWS",
+        "Data Structures & Algorithms",
+        "API Integration",
+        "Object Oriented Programming (OOPs)",
+        "Software engineering fundamentals",
+        "LangGraph",
+        "Google Gemini",
+        "Docling",
+        "Pywinauto",
+        "Pandas",
+        "AWS S3",
+        "GitHub",
+        "PHPMyAdmin",
+        "key-db",
+        "Redis",
+        "SQL",
+        "Claude APIs",
+        "Gemini APIs",
+        "Streamlit",
+        "ResNet",
+        "custom CNN",
+        "MLP",
+        "Keras",
+        "Java",
+        "IoT",
+        "LLMOps"
+    ],
+    "normalized_skills": [
+        "Python",
+        "HTML",
+        "CSS",
+        "TensorFlow",
+        "REST API",
+        "ReactJS",
+        "JavaScript",
+        "Machine Learning",
+        "Deep Learning",
+        "Natural Language Processing",
+        "LLM",
+        "Autoencoders",
+        "Computer Vision",
+        "YOLO",
+        "Time Series",
+        "LSTM",
+        "Attention Mechanism",
+        "Prompt Engineering",
+        "Data Visualization",
+        "Data Mining",
+        "Langchain",
+        "MySQL",
+        "Power BI",
+        "Git",
+        "KNIME",
+        "UiPath RPA",
+        "Robotic Process Automation",
+        "AWS",
+        "Data Structures & Algorithms",
+        "API Integration",
+        "Object Oriented Programming",
+        "Software Engineering Fundamentals",
+        "LangGraph",
+        "Gemini",
+        "Docling",
+        "Pywinauto",
+        "Pandas",
+        "GitHub",
+        "Redis",
+        "SQL",
+        "Claude",
+        "Streamlit",
+        "ResNet",
+        "Convolutional Neural Network (CNN)",
+        "Multi-Layer Perceptron (MLP)",
+        "Keras",
+        "Java",
+        "IoT",
+        "LLMOps"
+    ],
+    "skill_categories": {
+        "Programming Languages": [
+            "Python",
+            "JavaScript",
+            "HTML",
+            "CSS",
+            "Java",
+            "SQL"
+        ],
+        "AI/ML & Deep Learning": [
+            "Machine Learning",
+            "Deep Learning",
+            "Natural Language Processing",
+            "LLM",
+            "Autoencoders",
+            "Computer Vision",
+            "YOLO",
+            "Time Series",
+            "LSTM",
+            "Attention Mechanism",
+            "Prompt Engineering",
+            "TensorFlow",
+            "Keras",
+            "ResNet",
+            "Convolutional Neural Network (CNN)",
+            "Multi-Layer Perceptron (MLP)"
+        ],
+        "Data Science & Analytics": [
+            "Data Visualization",
+            "Data Mining",
+            "Pandas"
+        ],
+        "Databases": [
+            "MySQL",
+            "Redis"
+        ],
+        "Web Technologies": [
+            "ReactJS"
+        ],
+        "Frameworks & Libraries": [
+            "Langchain",
+            "LangGraph",
+            "Pywinauto",
+            "Streamlit"
+        ],
+        "Cloud & DevOps": [
+            "AWS",
+            "Git",
+            "GitHub",
+            "API Integration",
+            "LLMOps"
+        ],
+        "Tools & Platforms": [
+            "Power BI",
+            "KNIME",
+            "UiPath RPA",
+            "Robotic Process Automation",
+            "Docling",
+            "Gemini",
+            "Claude",
+            "REST API"
+        ],
+        "Core CS & Software Engineering": [
+            "Data Structures & Algorithms",
+            "Object Oriented Programming",
+            "Software Engineering Fundamentals"
+        ],
+        "Emerging Technologies": [
+            "IoT"
+        ]
+    },
+    "education": [
+        {
+            "degree": "B.Tech, Artificial Intelligence and Data Science",
+            "institution": "Easwari Engineering College, Anna University",
+            "year": "2025"
+        }
+    ],
+    "experience": [
+        {
+            "job_title": "AI Intern",
+            "company": "Infiswift Technologies",
+            "duration": "February 2026 - current",
+            "description": "Developed an AI pipeline using LangGraph, Google Gemini, and Docling to automatically parse technical PDF blueprints, extracting complex layout details and text into clean, structured JSON data. Wrote Python automation scripts using Pywinauto and Pandas to programmatically navigate desktop applications and filter data, replacing repetitive manual tasks with a fast, error-free workflow. Connected local automation tools to company infrastructure by writing code to handle automatic AWS S3 uploads and MySQL database connections, while actively collaborating with the engineering team via GitHub"
+        },
+        {
+            "job_title": "Junior AI Developer",
+            "company": "SEnergy",
+            "duration": "August 2025 - January 2026",
+            "description": "Developing logic-based Python algorithms and machine learning models for financial trading systems. Responsibilities include data collection, preprocessing, modeling, debugging, backtesting strategies and hyperparameter tuning indicators. Employed MySQL through PHPMyAdmin and key-db via Redis for real-time data storage, retrieval, and management. Use of APIs to request live trade data and use the response to generate paper trades with a pipeline."
+        },
+        {
+            "job_title": "Data Analytics Intern",
+            "company": "CoEZET, IIT Madras",
+            "duration": "June 2024",
+            "description": "Analyzed 15 months of toll plaza traffic data across India, performing statistical analysis on big data to identify top N corridors for introducing zero-emission trucks with KNIME. Cleaned data by removing outliers and duplicates, applied cross joins to filter plazas based on approximate distances, and visualized traffic distributions by vehicle category using Power BI."
+        },
+        {
+            "job_title": "Web developer",
+            "company": "Sacred Seva Foundation(NGO)",
+            "duration": "December 2023 - March 2024",
+            "description": "Created a functional website for an NGO using ReactJS, CSS that highlights its mission, projects, and initiatives, helping to raise awareness and connect with the community. Added interactive features like volunteer sign-up forms, making it easier for people to get involved and support the NGO's work. Designed the website to be responsive, user-friendly and easily navigatable, irrespective of the device they use."
+        },
+        {
+            "job_title": "Data Science Intern",
+            "company": "Infiswift Technologies",
+            "duration": "June 2023",
+            "description": "Cleaned and preprocessed a large weather dataset using Python, which enhanced data quality for AQI prediction. Trained and evaluated multiple machine learning models and performed hyperparameter tuning with Randomized Search, achieving a best accuracy (R\u00b2) of 0.62. Created advanced visualizations to extract and present key insights from the data. Implemented YOLO (You Only Look Once) for real-time object detection in images and videos."
+        }
+    ],
+    "projects": [
+        {
+            "name": "LLM-Based Dynamic Query Portal for SQL Databases",
+            "description": "Developed a portal where admins can retrieve database information using natural language queries with help of LLM APIs, eliminating the need to write SQL manually. Use of LLMOps principles for interaction reliability. Experimented with Claude and Gemini APIs and explored prompt optimization and response validation. Helped admins managing large events flexibly fetch data and perform complex queries using conversational prompts.",
+            "technologies": [
+                "LLM APIs",
+                "SQL",
+                "Claude",
+                "Gemini",
+                "LLMOps"
+            ]
+        },
+        {
+            "name": "Early Detection of Alzheimer's using Deep Learning",
+            "description": "Collected brain image and biomarker data from ADNI dataset and preprocessed them. Trained and deployed deep learning models for medical diagnostics. Used Streamlit for a front-end UI, simulating real-world application of the model. Built a combined model along with feature extraction with ResNet + custom CNN(Convolutional Neural Net) and Autoencoders + MLP (Multi-Layer Perceptron), trained the model and hypertuned parameters with an accuracy of 83%. Implemented LSTM (Progression prediction) + Attention Mechanism with accuracy of 86%.",
+            "technologies": [
+                "Deep Learning",
+                "Streamlit",
+                "ResNet",
+                "Convolutional Neural Network (CNN)",
+                "Autoencoders",
+                "Multi-Layer Perceptron (MLP)",
+                "LSTM",
+                "Attention Mechanism"
+            ]
+        }
+    ],
+    "certifications": [
+        {
+            "name": "Neural Networks",
+            "issuer": null,
+            "year": null
+        },
+        {
+            "name": "Keras",
+            "issuer": null,
+            "year": null
+        },
+        {
+            "name": "Robotic Process Automation",
+            "issuer": null,
+            "year": null
+        },
+        {
+            "name": "Java",
+            "issuer": "NPTEL",
+            "year": null
+        },
+        {
+            "name": "IoT",
+            "issuer": "NPTEL",
+            "year": null
+        }
+    ]
+}

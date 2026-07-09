@@ -1,0 +1,73 @@
+Senior Engineer - AI, ML
+Infiswift Technologies
+
+Location: Work from home
+Experience: 3-6 years
+Employment type: Contract-to-hire, full-time
+Function: Data Science and Analysis - Data Science / Machine Learning
+
+ABOUT INFISWIFT TECHNOLOGIES
+
+Infiswift Technologies enables enterprises with functional artificial intelligence. Using its IoT and AI platform, the company develops working solutions for renewables, energy transition, manufacturing, and industrial use cases. The team works with business stakeholders and internal software and technology teams to deliver secure and flexible deployments while leveraging existing technology where possible.
+
+JOB DESCRIPTION
+
+Infiswift Technologies is looking for a highly skilled senior engineer with deep Python expertise, a strong foundation in artificial intelligence, machine learning, and computer vision, and hands-on experience training and deploying machine learning models into production.
+
+This is initially a contract position. Based on performance and business needs, there may be an opportunity to convert to a permanent full-time role.
+
+RESPONSIBILITIES
+
+- Build and optimize real-time computer vision systems for detection, classification, segmentation, and multi-object tracking.
+- Train, fine-tune, and deploy deep learning models such as CNNs, RNNs, Mask R-CNN, SSD, and EfficientDet.
+- Write and maintain robust, scalable, production-quality Python code.
+- Improve existing in-house models through evaluation, retraining, and performance tuning.
+- Develop tools to analyze large datasets and measure model and system performance.
+- Work with multi-camera video and audio inputs in embedded and real-time environments.
+
+REQUIREMENTS
+
+- At least 3-5 years of industry experience in AI/ML, computer vision, and software engineering.
+- Advanced Python skills and the ability to write clean, modular, and efficient code.
+- Proven experience training, evaluating, and deploying deep learning models using TensorFlow or PyTorch.
+- Strong knowledge of OpenCV, Pillow/PIL, and image-processing libraries.
+- Familiarity with classification, object detection, segmentation, and tracking algorithms.
+- Experience with Jupyter, pandas, Linux, and scripting tools.
+- Solid understanding of software-engineering best practices.
+- Strong problem-solving and communication skills.
+
+KEY SKILLS
+
+- Python
+- Artificial Intelligence
+- Machine Learning
+- Computer Vision
+- Deep Learning
+- OpenCV
+- Pillow/PIL
+- TensorFlow
+- PyTorch
+- CNNs
+- RNNs
+- Mask R-CNN
+- SSD
+- EfficientDet
+- Image classification
+- Object detection
+- Image segmentation
+- Multi-object tracking
+- Image processing
+- Model training
+- Model evaluation
+- Model deployment
+- Model retraining
+- Performance tuning
+- Real-time systems
+- Embedded systems
+- Multi-camera video processing
+- Audio processing
+- Jupyter
+- pandas
+- Linux
+- Scripting
+- Software-engineering best practices

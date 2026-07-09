@@ -1,0 +1,182 @@
+{
+    "eligibility": {
+        "meets_experience": false,
+        "missing_must_haves": [
+            "Artificial Intelligence",
+            "Audio Processing",
+            "CNNs",
+            "Communication Skills",
+            "EfficientDet",
+            "Embedded Systems",
+            "Image Classification",
+            "Image Processing",
+            "Image Segmentation",
+            "Jupyter",
+            "Linux",
+            "Mask R-CNN",
+            "Model Deployment",
+            "Model Evaluation",
+            "Model Retraining",
+            "Model Training",
+            "Multi-camera Video Processing",
+            "Multi-object Tracking",
+            "Object Detection",
+            "OpenCV",
+            "Performance Tuning",
+            "Pillow/PIL",
+            "Problem Solving",
+            "PyTorch",
+            "RNNs",
+            "Real-time Systems",
+            "SSD",
+            "Scripting",
+            "Software Engineering Best Practices"
+        ]
+    },
+    "match_scores": {
+        "skills": {
+            "score": 17.14,
+            "common_skills": [
+                "TensorFlow",
+                "Machine Learning",
+                "pandas",
+                "Computer Vision",
+                "Deep Learning",
+                "Python"
+            ],
+            "required_skills": [
+                "Software Engineering Best Practices",
+                "Machine Learning",
+                "EfficientDet",
+                "Linux",
+                "Computer Vision",
+                "Model Retraining",
+                "Performance Tuning",
+                "OpenCV",
+                "PyTorch",
+                "Object Detection",
+                "Audio Processing",
+                "Model Evaluation",
+                "Image Processing",
+                "Mask R-CNN",
+                "Multi-camera Video Processing",
+                "Communication Skills",
+                "Scripting",
+                "Problem Solving",
+                "pandas",
+                "RNNs",
+                "Real-time Systems",
+                "Image Segmentation",
+                "Jupyter",
+                "Pillow/PIL",
+                "Multi-object Tracking",
+                "Python",
+                "Image Classification",
+                "TensorFlow",
+                "SSD",
+                "Deep Learning",
+                "Model Deployment",
+                "Embedded Systems",
+                "CNNs",
+                "Model Training",
+                "Artificial Intelligence"
+            ],
+            "preferred_skills": [],
+            "matched": [
+                "Computer Vision",
+                "Deep Learning",
+                "Machine Learning",
+                "Python",
+                "TensorFlow",
+                "pandas"
+            ],
+            "missing": [
+                "Artificial Intelligence",
+                "Audio Processing",
+                "CNNs",
+                "Communication Skills",
+                "EfficientDet",
+                "Embedded Systems",
+                "Image Classification",
+                "Image Processing",
+                "Image Segmentation",
+                "Jupyter",
+                "Linux",
+                "Mask R-CNN",
+                "Model Deployment",
+                "Model Evaluation",
+                "Model Retraining",
+                "Model Training",
+                "Multi-camera Video Processing",
+                "Multi-object Tracking",
+                "Object Detection",
+                "OpenCV",
+                "Performance Tuning",
+                "Pillow/PIL",
+                "Problem Solving",
+                "PyTorch",
+                "RNNs",
+                "Real-time Systems",
+                "SSD",
+                "Scripting",
+                "Software Engineering Best Practices"
+            ],
+            "evidence": [
+                "Computer Vision listed in normalized skills",
+                "Deep Learning listed in raw skills",
+                "Deep Learning listed in normalized skills",
+                "Deep Learning shown in Early Detection of Alzheimer's using Deep Learning",
+                "Machine Learning listed in raw skills",
+                "Machine Learning listed in normalized skills",
+                "Machine Learning mentioned in Junior AI Developer at SEnergy",
+                "Python listed in raw skills",
+                "Python listed in normalized skills",
+                "Python mentioned in AI Intern at Infiswift Technologies",
+                "TensorFlow listed in raw skills",
+                "TensorFlow listed in normalized skills",
+                "Pandas listed in raw skills",
+                "Pandas listed in normalized skills",
+                "pandas mentioned in AI Intern at Infiswift Technologies"
+            ]
+        },
+        "experience": {
+            "score": 25,
+            "relevance": "High",
+            "years_experience": 1.4,
+            "matches_requirements": false,
+            "matched": [],
+            "missing": [
+                "3-6 years of professional experience"
+            ],
+            "evidence": [
+                "AI Intern at Infiswift Technologies (Feb 2026 - Jul 2026): 5 months",
+                "Junior AI Developer at SEnergy (Aug 2025 - Jan 2026): 6 months",
+                "Data Analytics Intern at CoEZET, IIT Madras (Jun 2024): 1 month",
+                "Web developer at Sacred Seva Foundation (NGO) (Dec 2023 - Mar 2024): 4 months",
+                "Data Science Intern at Infiswift Technologies (Jun 2023): 1 month",
+                "Total calculated experience: Approximately 1 year 5 months (1.4 years)"
+            ]
+        },
+        "education": {
+            "score": null,
+            "status": "not_specified",
+            "reason": "No education requirement specified in the job description.",
+            "matched": [],
+            "missing": [],
+            "evidence": [
+                "The job description does not specify an education requirement."
+            ]
+        }
+    },
+    "overall_score": 20.09,
+    "strengths": [
+        "Strong foundational skills in Python, Machine Learning, Deep Learning, and Computer Vision (e.g., YOLO, CNNs, Autoencoders).",
+        "Practical experience applying AI/ML concepts through internships and projects, including LLM-based solutions and data analysis.",
+        "Demonstrated understanding of MLOps principles and cloud integration (AWS S3, API integration) relevant to AI deployment."
+    ],
+    "weaknesses": [
+        "Significantly less experience (1.4 years) than the required 3-6 years for a Senior Engineer role.",
+        "Lack of specified experience with key required Computer Vision technologies and deep learning architectures such as PyTorch, OpenCV, Mask R-CNN, SSD, and EfficientDet.",
+        "Limited to no explicit experience with real-time systems, embedded systems, or multi-camera video/audio processing, which are critical responsibilities for this role."
+    ]
+}

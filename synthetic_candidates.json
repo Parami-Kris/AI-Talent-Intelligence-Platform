@@ -1,0 +1,344 @@
+[
+    {
+        "name": "Aarav Menon",
+        "email": "aarav.menon@example.com",
+        "phone": "+91 9000000001",
+        "linkedin": ["https://www.linkedin.com/in/aarav-menon"],
+        "github": ["https://github.com/aarav-menon"],
+        "raw_skills": [
+            "Python",
+            "AI",
+            "ML",
+            "Computer Vision",
+            "Deep Learning",
+            "TensorFlow",
+            "PyTorch",
+            "OpenCV",
+            "PIL",
+            "Image Processing",
+            "CNNs",
+            "RNNs",
+            "Mask R-CNN",
+            "SSD",
+            "EfficientDet",
+            "Image Classification",
+            "Object Detection",
+            "Image Segmentation",
+            "Multi-object Tracking",
+            "Model Training",
+            "Model Evaluation",
+            "Model Deployment",
+            "Model Retraining",
+            "Performance Tuning",
+            "Real-time Systems",
+            "Embedded Systems",
+            "Multi-camera Video Processing",
+            "Audio Processing",
+            "Jupyter",
+            "pandas",
+            "Linux",
+            "Scripting",
+            "Software Engineering Best Practices",
+            "Problem Solving",
+            "Communication Skills"
+        ],
+        "normalized_skills": [
+            "Python",
+            "Artificial Intelligence",
+            "Machine Learning",
+            "Computer Vision",
+            "Deep Learning",
+            "TensorFlow",
+            "PyTorch",
+            "OpenCV",
+            "Pillow/PIL",
+            "Image Processing",
+            "CNNs",
+            "RNNs",
+            "Mask R-CNN",
+            "SSD",
+            "EfficientDet",
+            "Image Classification",
+            "Object Detection",
+            "Image Segmentation",
+            "Multi-object Tracking",
+            "Model Training",
+            "Model Evaluation",
+            "Model Deployment",
+            "Model Retraining",
+            "Performance Tuning",
+            "Real-time Systems",
+            "Embedded Systems",
+            "Multi-camera Video Processing",
+            "Audio Processing",
+            "Jupyter",
+            "pandas",
+            "Linux",
+            "Scripting",
+            "Software Engineering Best Practices",
+            "Problem Solving",
+            "Communication Skills"
+        ],
+        "skill_categories": {},
+        "education": [
+            {
+                "degree": "M.Tech, Computer Vision",
+                "institution": "IIT Hyderabad",
+                "year": "2021"
+            }
+        ],
+        "experience": [
+            {
+                "job_title": "Senior Computer Vision Engineer",
+                "company": "VisionEdge Robotics",
+                "duration": "June 2021 - current",
+                "description": "Built real-time computer vision systems in Python using OpenCV, PyTorch, TensorFlow, Mask R-CNN, SSD, EfficientDet, CNNs, RNNs, and Pillow/PIL. Delivered image classification, object detection, image segmentation, and multi-object tracking for multi-camera video processing on Linux embedded systems. Owned model training, evaluation, deployment, retraining, performance tuning, audio processing integration, scripting, Jupyter analysis, pandas reporting, and software engineering best practices."
+            }
+        ],
+        "projects": [
+            {
+                "title": "Real-time Multi-camera Defect Detection",
+                "description": "Production deployment of OpenCV and PyTorch models for detection, segmentation, tracking, and performance tuning."
+            }
+        ],
+        "certifications": []
+    },
+    {
+        "name": "Meera Rao",
+        "email": "meera.rao@example.com",
+        "phone": "+91 9000000002",
+        "linkedin": ["https://www.linkedin.com/in/meera-rao"],
+        "github": ["https://github.com/meera-rao"],
+        "raw_skills": [
+            "Python",
+            "Machine Learning",
+            "Computer Vision",
+            "Deep Learning",
+            "TensorFlow",
+            "PyTorch",
+            "OpenCV",
+            "Image Processing",
+            "CNNs",
+            "Image Classification",
+            "Object Detection",
+            "Model Training",
+            "Model Evaluation",
+            "pandas",
+            "Linux",
+            "Jupyter",
+            "Problem Solving",
+            "Communication Skills"
+        ],
+        "normalized_skills": [
+            "Python",
+            "Machine Learning",
+            "Computer Vision",
+            "Deep Learning",
+            "TensorFlow",
+            "PyTorch",
+            "OpenCV",
+            "Image Processing",
+            "CNNs",
+            "Image Classification",
+            "Object Detection",
+            "Model Training",
+            "Model Evaluation",
+            "pandas",
+            "Linux",
+            "Jupyter",
+            "Problem Solving",
+            "Communication Skills"
+        ],
+        "skill_categories": {},
+        "education": [
+            {
+                "degree": "B.Tech, Artificial Intelligence",
+                "institution": "Anna University",
+                "year": "2022"
+            }
+        ],
+        "experience": [
+            {
+                "job_title": "Computer Vision Engineer",
+                "company": "RetailSight AI",
+                "duration": "August 2022 - current",
+                "description": "Developed Python computer vision models with TensorFlow, PyTorch, OpenCV, CNNs, image processing, image classification, object detection, model training, and model evaluation. Used pandas and Jupyter on Linux while collaborating with product teams."
+            }
+        ],
+        "projects": [
+            {
+                "title": "Shelf Object Detection",
+                "description": "TensorFlow and OpenCV object detection pipeline for retail shelf analytics."
+            }
+        ],
+        "certifications": []
+    },
+    {
+        "name": "Parami Krishnamurthy Synthetic",
+        "email": "parami.synthetic@example.com",
+        "phone": "+91 9000000003",
+        "linkedin": ["https://www.linkedin.com/in/parami-kris/"],
+        "github": ["https://parami-kris.github.io/"],
+        "raw_skills": [
+            "Python",
+            "TensorFlow",
+            "Machine Learning",
+            "Deep Learning",
+            "Computer Vision",
+            "YOLO",
+            "Pandas",
+            "LangGraph",
+            "Gemini",
+            "Docling",
+            "MySQL",
+            "AWS S3"
+        ],
+        "normalized_skills": [
+            "Python",
+            "TensorFlow",
+            "Machine Learning",
+            "Deep Learning",
+            "Computer Vision",
+            "YOLO",
+            "pandas",
+            "LangGraph",
+            "Gemini",
+            "Docling",
+            "MySQL",
+            "AWS"
+        ],
+        "skill_categories": {},
+        "education": [
+            {
+                "degree": "B.Tech, Artificial Intelligence and Data Science",
+                "institution": "Easwari Engineering College",
+                "year": "2025"
+            }
+        ],
+        "experience": [
+            {
+                "job_title": "AI Intern",
+                "company": "Infiswift Technologies",
+                "duration": "February 2026 - current",
+                "description": "Developed an AI pipeline using LangGraph, Google Gemini, Docling, Python, and Pandas to parse technical PDF blueprints into structured JSON."
+            },
+            {
+                "job_title": "Junior AI Developer",
+                "company": "SEnergy",
+                "duration": "August 2025 - January 2026",
+                "description": "Built Python machine learning models for trading systems with preprocessing, debugging, backtesting, MySQL, Redis, and APIs."
+            }
+        ],
+        "projects": [
+            {
+                "title": "YOLO Computer Vision Project",
+                "description": "Computer vision prototype using YOLO, TensorFlow, and Python."
+            }
+        ],
+        "certifications": []
+    },
+    {
+        "name": "Dev Sharma",
+        "email": "dev.sharma@example.com",
+        "phone": "+91 9000000004",
+        "linkedin": ["https://www.linkedin.com/in/dev-sharma"],
+        "github": ["https://github.com/dev-sharma"],
+        "raw_skills": [
+            "Python",
+            "Natural Language Processing",
+            "LLMs",
+            "LangChain",
+            "RAG",
+            "FastAPI",
+            "AWS",
+            "Docker",
+            "pandas",
+            "Machine Learning"
+        ],
+        "normalized_skills": [
+            "Python",
+            "Natural Language Processing",
+            "LLM",
+            "LangChain",
+            "Retrieval-Augmented Generation",
+            "FastAPI",
+            "AWS",
+            "Docker",
+            "pandas",
+            "Machine Learning"
+        ],
+        "skill_categories": {},
+        "education": [
+            {
+                "degree": "B.E., Computer Science",
+                "institution": "Mumbai University",
+                "year": "2020"
+            }
+        ],
+        "experience": [
+            {
+                "job_title": "Machine Learning Engineer",
+                "company": "TextForge AI",
+                "duration": "July 2020 - current",
+                "description": "Built Python NLP, LLM, RAG, LangChain, FastAPI, Docker, AWS, pandas, and machine learning services for enterprise document automation."
+            }
+        ],
+        "projects": [
+            {
+                "title": "Enterprise RAG Assistant",
+                "description": "LLM-based search and question-answering over PDFs."
+            }
+        ],
+        "certifications": []
+    },
+    {
+        "name": "Nisha Iyer",
+        "email": "nisha.iyer@example.com",
+        "phone": "+91 9000000005",
+        "linkedin": ["https://www.linkedin.com/in/nisha-iyer"],
+        "github": ["https://github.com/nisha-iyer"],
+        "raw_skills": [
+            "Python",
+            "Machine Learning",
+            "Computer Vision",
+            "OpenCV",
+            "Image Processing",
+            "Object Detection",
+            "TensorFlow",
+            "pandas"
+        ],
+        "normalized_skills": [
+            "Python",
+            "Machine Learning",
+            "Computer Vision",
+            "OpenCV",
+            "Image Processing",
+            "Object Detection",
+            "TensorFlow",
+            "pandas"
+        ],
+        "skill_categories": {},
+        "education": [
+            {
+                "degree": "B.Tech, Electronics and Communication",
+                "institution": "SRM University",
+                "year": "2026"
+            }
+        ],
+        "experience": [
+            {
+                "job_title": "Computer Vision Intern",
+                "company": "FactoryAI Labs",
+                "duration": "January 2026 - current",
+                "description": "Implemented Python OpenCV image processing and TensorFlow object detection experiments for manufacturing images. Used pandas for analysis."
+            }
+        ],
+        "projects": [
+            {
+                "title": "OpenCV Defect Detector",
+                "description": "Student project for object detection and image processing using Python and OpenCV."
+            }
+        ],
+        "certifications": []
+    }
+]

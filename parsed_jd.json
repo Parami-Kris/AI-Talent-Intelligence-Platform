@@ -1,0 +1,108 @@
+{
+    "job_title": "Senior Engineer - AI, ML",
+    "required_skills": [
+        "Python",
+        "Artificial Intelligence",
+        "Machine Learning",
+        "Computer Vision",
+        "Deep Learning",
+        "TensorFlow",
+        "PyTorch",
+        "OpenCV",
+        "Pillow/PIL",
+        "Image Processing",
+        "CNNs",
+        "RNNs",
+        "Mask R-CNN",
+        "SSD",
+        "EfficientDet",
+        "Image Classification",
+        "Object Detection",
+        "Image Segmentation",
+        "Multi-object Tracking",
+        "Model Training",
+        "Model Evaluation",
+        "Model Deployment",
+        "Model Retraining",
+        "Performance Tuning",
+        "Real-time Systems",
+        "Embedded Systems",
+        "Multi-camera Video Processing",
+        "Audio Processing",
+        "Jupyter",
+        "pandas",
+        "Linux",
+        "Scripting",
+        "Software Engineering Best Practices",
+        "Problem Solving",
+        "Communication Skills"
+    ],
+    "preferred_skills": [],
+    "skill_categories": {
+        "Programming Languages": [
+            "Python",
+            "Scripting"
+        ],
+        "AI & Machine Learning Core": [
+            "Artificial Intelligence",
+            "Machine Learning",
+            "Deep Learning"
+        ],
+        "Deep Learning Models & Architectures": [
+            "CNNs",
+            "RNNs",
+            "Mask R-CNN",
+            "SSD",
+            "EfficientDet"
+        ],
+        "Computer Vision": [
+            "Computer Vision",
+            "Image Processing",
+            "Image Classification",
+            "Object Detection",
+            "Image Segmentation",
+            "Multi-object Tracking",
+            "Multi-camera Video Processing"
+        ],
+        "ML Operations & Model Management": [
+            "Model Training",
+            "Model Evaluation",
+            "Model Deployment",
+            "Model Retraining",
+            "Performance Tuning"
+        ],
+        "Libraries & Frameworks": [
+            "TensorFlow",
+            "PyTorch",
+            "OpenCV",
+            "Pillow/PIL",
+            "pandas"
+        ],
+        "Operating Systems & Tools": [
+            "Linux",
+            "Jupyter"
+        ],
+        "System Environments": [
+            "Real-time Systems",
+            "Embedded Systems"
+        ],
+        "Other Technical Skills": [
+            "Audio Processing"
+        ],
+        "Professional Skills": [
+            "Software Engineering Best Practices",
+            "Problem Solving",
+            "Communication Skills"
+        ]
+    },
+    "experience_required": "3-6 years",
+    "education_required": "",
+    "responsibilities": [
+        "Build and optimize real-time computer vision systems for detection, classification, segmentation, and multi-object tracking.",
+        "Train, fine-tune, and deploy deep learning models such as CNNs, RNNs, Mask R-CNN, SSD, and EfficientDet.",
+        "Write and maintain robust, scalable, production-quality Python code.",
+        "Improve existing in-house models through evaluation, retraining, and performance tuning.",
+        "Develop tools to analyze large datasets and measure model and system performance.",
+        "Work with multi-camera video and audio inputs in embedded and real-time environments."
+    ]
+}
