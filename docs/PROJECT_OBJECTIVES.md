@@ -230,6 +230,8 @@ Candidate profiles + JD
   -> batch ranking
   -> shortlist selection
   -> LLM experience relevance reranking
+  -> human review checkpoint (recruiter approves, edits, or rejects; can
+     manually add a non-shortlisted candidate with a justification)
   -> final rankings
   -> database storage
   -> web dashboard
@@ -335,6 +337,23 @@ Current capabilities:
 - produces final rank and final score
 - catches cases where years are present but domain relevance is weak
 
+### LangGraph human-in-the-loop pipeline
+
+Implemented:
+
+- `backend/app/pipeline/ranking_graph.py`
+- `backend/app/schemas/pipeline.py`
+- `POST /pipeline/run`, `POST /pipeline/resume`
+
+Current capabilities:
+
+- explicit `StateGraph` orchestrating the existing rank -> rerank -> persist services (no ranking logic reimplemented)
+- conditional edge that skips reranking/persistence entirely when zero candidates are eligible
+- human-in-the-loop interrupt before persistence: a recruiter can `approve` the shortlist as-is, `reject` the run, or `edit` it
+- editing supports `manual_additions` — flagging a candidate who wasn't LLM-shortlisted (e.g. one who interviewed well but whose resume underrepresented them) with a required `override_reason`, so the persisted record still carries evidence for the override
+- resumable via LangGraph's `interrupt()`/`Command(resume=...)` pattern with an `InMemorySaver` checkpointer keyed by `thread_id` (in-process/dev-only; a durable checkpointer is a natural swap if persistence across restarts is needed)
+- additive: `/rank-candidates`, `/rerank-shortlist`, `/save-rankings` are unchanged
+
 ### MySQL foundation
 
 Implemented:
@@ -376,36 +395,45 @@ Current capabilities:
 - `POST /analyze-profile-gap` (job seeker qualification-gap analysis)
 - `POST /save-rankings` (persist a ranking payload to MySQL)
 - `POST /upload/rank-candidates` (multipart upload: one JD file + multiple resume files, parses each via Docling/Gemini, ranks the batch, and reports per-resume parse failures without stopping the batch)
+- `POST /pipeline/run` / `POST /pipeline/resume` (LangGraph human-in-the-loop pipeline, see above)
+- every route now declares a Pydantic `response_model` (`backend/app/schemas/ranking.py`, `backend/app/schemas/pipeline.py`), not plain dicts
+
+### Malformed LLM JSON handling
+
+Implemented:
+
+- `backend/app/utils/llm_json.py::parse_llm_json` — shared strip-fences + try/except + `{"error", "raw_response"}` pattern (previously only `llm_parser.extract_structured_resume` had this)
+- `jd_parser.extract_structured_jd` now returns `{"error": ..., "raw_response": ...}` on failure instead of a bare `{}`, and `resume_intake_service.parse_jd_upload` surfaces that error the same way the resume path already did
+- `matcher.education_match` / `experience_match` / `analyze_match` no longer raise an uncaught `JSONDecodeError` on malformed output
+- `batch_ranker.batch_education_match` and `shortlist_reranker.rerank_experience_relevance` — the two functions actually on the live `/rank-candidates` and `/rerank-shortlist` paths — degrade gracefully on a parse failure (fall back to "not evaluated" stubs / first-pass score carried forward) instead of 500ing the whole request
 
 ### Automated tests
 
 Implemented:
 
-- `tests/` (pytest) covering parser, matcher, batch ranker, shortlist reranker, input service, resume intake service, and the FastAPI `/health` and `/rank-candidates` routes
+- `tests/` (pytest) covering parser, matcher, batch ranker, shortlist reranker, input service, resume intake service, the LangGraph pipeline, and every FastAPI route (including response-model validation)
 - `conftest.py` at repo root so tests can import the top-level scripts as modules
-
-Deliberately not covered yet: functions that call the Gemini API directly (`education_match`, `experience_match`, `analyze_match`, `extract_structured_resume`, `extract_structured_jd`, batched LLM reranking) — these need mocking or recorded fixtures, not done yet.
+- `tests/_fakes.py` — a small fake Gemini client/response pair (no new mocking dependency) used to test the Gemini-calling functions without hitting the real API
+- Gemini-calling functions now have success + malformed-JSON test coverage: `education_match`, `experience_match`, `analyze_match`, `extract_structured_jd`, `batch_education_match`, `rerank_experience_relevance`
 
 ## Current Completion Estimate
 
-Approximate status: 35-45%.
+Approximate status: 40-50%.
 
-The project has a working AI pipeline prototype, a FastAPI backend exposing that pipeline (including file upload ingestion), initial persistence, and a starter automated test suite. It is not yet a complete product.
+The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, initial persistence, and a test suite that now covers the Gemini-calling code paths. It is not yet a complete product.
 
 Major missing pieces:
 
 - actual frontend website
-- a real git history (see Known Issues below)
-- robust validation/error handling for malformed LLM JSON in the non-batch paths (`jd_parser.extract_structured_jd` silently returns `{}` on parse failure; `education_match`/`experience_match`/`analyze_match` in `matcher.py` do not catch `JSONDecodeError` at all)
 - UI/UX
 - Docker setup
 - evaluation/benchmarking against a labeled dataset
 - documentation and demo assets
-- test coverage for LLM-calling functions (mocked or recorded)
+- a durable (non-in-memory) checkpointer for the LangGraph pipeline if it needs to survive process restarts
 
 ## Known Issues
 
-- The `.git` directory exists but is empty (no commits, no HEAD, no refs) — this is not currently a working repository. Run `git init` and make an initial commit before relying on git history, branches, or a GitHub remote for this portfolio project.
+- (Resolved) The repo previously had no commits. It now has an initial commit and is pushed to `https://github.com/Parami-Kris/AI-Talent-Intelligence-Platform`.
 
 ## Next Engineering Tasks
 
@@ -415,15 +443,12 @@ Goal: turn scripts into backend services without breaking current scripts.
 
 Done:
 
-- FastAPI app with health, ranking, reranking, profile-gap, persistence, and upload endpoints
+- FastAPI app with health, ranking, reranking, profile-gap, persistence, upload, and LangGraph pipeline endpoints
 - ranking logic in service modules
-- request schemas (Pydantic)
+- request and response schemas (Pydantic)
 - connected to the MySQL repository layer
-
-Still open from the original phase:
-
-- add error handling for malformed LLM JSON in `jd_parser.py` / `matcher.py` (currently only `llm_parser.extract_structured_resume` handles this)
-- add response schemas (routes currently return plain dicts, not validated Pydantic response models)
+- shared malformed-LLM-JSON error handling (`jd_parser.py`, `matcher.py`, `batch_ranker.py`, `shortlist_reranker.py`)
+- mocked test coverage for the Gemini-calling functions
 
 ### Phase 2 - Multi-resume ingestion (mostly done)
 
@@ -502,11 +527,9 @@ Tasks:
 
 ## Near-Term Priority
 
-The FastAPI backend foundation (Phase 1) and file-upload ingestion (Phase 2) are done. The immediate next best step is:
+The FastAPI backend foundation (Phase 1, including the LangGraph human-in-the-loop pipeline, response schemas, malformed-JSON handling, and mocked LLM test coverage) and file-upload ingestion (Phase 2) are done. The immediate next best step is:
 
-> Fix the git repository (it currently has no commits), then start the Phase 3 web app so the API has a real frontend to bridge to.
-
-Secondary priorities: response schemas for the existing endpoints, error handling for the two remaining unguarded JSON-parsing paths (`jd_parser.py`, `matcher.py`), and test coverage (mocked) for the LLM-calling functions.
+> Start the Phase 3 web app so the API has a real frontend to bridge to.
 
 ## Notes for Recruiter/LinkedIn Positioning
 
@@ -516,8 +539,8 @@ Avoid presenting the project as:
 
 Present it as:
 
-> I built an end-to-end AI Talent Intelligence Platform with document parsing, structured resume/JD extraction, deterministic eligibility checks, evidence-backed ranking, job seeker qualification-gap analysis, LLM-based shortlist reranking, MySQL persistence, and planned recruiter/job-seeker dashboards.
+> I built an end-to-end AI Talent Intelligence Platform with document parsing, structured resume/JD extraction, deterministic eligibility checks, evidence-backed ranking, a LangGraph-orchestrated ranking pipeline with a human-in-the-loop review checkpoint, job seeker qualification-gap analysis, LLM-based shortlist reranking, MySQL persistence, and planned recruiter/job-seeker dashboards.
 
 Possible resume bullet:
 
-> Built an AI-assisted talent intelligence platform using Python, Gemini, Docling, and MySQL, combining structured resume/JD parsing, deterministic eligibility checks, evidence-backed scoring, batch ranking, LLM-based shortlist reranking, and job seeker qualification-gap analysis.
+> Built an AI-assisted talent intelligence platform using Python, Gemini, LangGraph, Docling, and MySQL, combining structured resume/JD parsing, deterministic eligibility checks, evidence-backed scoring, batch ranking, LLM-based shortlist reranking, a stateful human-in-the-loop review pipeline, and job seeker qualification-gap analysis.

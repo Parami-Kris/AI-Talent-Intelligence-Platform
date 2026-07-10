@@ -1,7 +1,12 @@
 import argparse
 import json
+import logging
 
 from matcher import MODEL_ID, client, jd_data
+
+from backend.app.utils.llm_json import parse_llm_json
+
+logger = logging.getLogger(__name__)
 
 
 def load_json(path):
@@ -83,8 +88,25 @@ Return ONLY valid JSON as a list, one result per candidate:
 ]
 """
     response = client.models.generate_content(model=MODEL_ID, contents=prompt)
-    cleaned = response.text.replace("```json", "").replace("```", "").strip()
-    return json.loads(cleaned)
+    raw = parse_llm_json(response.text)
+
+    if isinstance(raw, dict) and "error" in raw:
+        logger.error("Shortlist rerank failed to parse LLM response: %s", raw["error"])
+        return [
+            {
+                "candidate_name": item["candidate_name"],
+                "experience_relevance_score": item["first_pass_overall_score"],
+                "seniority_fit": "not_evaluated",
+                "domain_fit": "not_evaluated",
+                "reason": "Experience relevance could not be evaluated due to a parsing error; first-pass score carried forward unchanged.",
+                "matched": [],
+                "missing": [],
+                "evidence": [],
+            }
+            for item in shortlist_payload
+        ]
+
+    return raw if isinstance(raw, list) else []
 
 
 def merge_rerank_results(first_pass, rerank_results):

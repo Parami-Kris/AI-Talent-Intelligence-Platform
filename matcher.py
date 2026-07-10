@@ -5,6 +5,8 @@ import json
 import re
 from datetime import date
 
+from backend.app.utils.llm_json import parse_llm_json
+
 load_dotenv()
 
 MODEL_ID = os.getenv("GENAI_MODEL", "gemini-2.5-flash")
@@ -151,9 +153,7 @@ Return ONLY valid JSON:
 """
 
     response = client.models.generate_content(model=MODEL_ID,contents=prompt)
-    cleaned = (response.text.replace("```json", "").replace("```", "").strip())
-
-    return json.loads(cleaned)
+    return parse_llm_json(response.text)
 
 def experience_match(resume,jd):
     prompt = f"""
@@ -181,8 +181,7 @@ def experience_match(resume,jd):
     }}
     """
     response = client.models.generate_content(model=MODEL_ID, contents=prompt)
-    cleaned_response = response.text.replace("```json", "").replace("```", "").strip()
-    return json.loads(cleaned_response)
+    return parse_llm_json(response.text)
 
 
 def eligibility_match(skill_result, exp_result):
@@ -220,8 +219,7 @@ def analyze_match(resume, jd, scores):
     Return ONLY valid JSON.
     """
     response = client.models.generate_content(model=MODEL_ID, contents=prompt)
-    cleaned_response = response.text.replace("```json", "").replace("```", "").strip()
-    return json.loads(cleaned_response)
+    return parse_llm_json(response.text)
 
 def overall_match(skill_result,edu_result,exp_result):
 
@@ -239,8 +237,13 @@ def overall_match(skill_result,edu_result,exp_result):
 
 if __name__ == "__main__":
     skill_result = skill_match(candidate_data, jd_data)
-    edu_result = education_match(candidate_data, jd_data) 
+    edu_result = education_match(candidate_data, jd_data)
     exp_result = experience_match(candidate_data, jd_data)
+
+    for label, result in (("education", edu_result), ("experience", exp_result)):
+        if isinstance(result, dict) and "error" in result:
+            raise SystemExit(f"Failed to parse LLM {label} match response: {result['error']}")
+
     overall_result = overall_match(skill_result, edu_result, exp_result)
     eligibility = eligibility_match(skill_result, exp_result)
     

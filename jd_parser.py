@@ -4,6 +4,8 @@ import logging
 from dotenv import load_dotenv
 from google import genai
 
+from backend.app.utils.llm_json import parse_llm_json
+
 load_dotenv()
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -44,15 +46,7 @@ def extract_structured_jd(text):
     """
 
     response = client.models.generate_content(model=MODEL_ID, contents=prompt)
-
-    cleaned_response = response.text.replace("```json", "").replace("```", "").strip()
-
-    try:
-        structured_data = json.loads(cleaned_response)
-        return structured_data
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON: {e}")
-        return {}
+    return parse_llm_json(response.text)
 
 if __name__ == "__main__":
     try:

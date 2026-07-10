@@ -1,10 +1,26 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from uuid import uuid4
 
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from langgraph.types import Command
+
+from backend.app.pipeline.ranking_graph import extract_interrupt_payload, pipeline_graph
+from backend.app.schemas.pipeline import (
+    PipelineResumeRequest,
+    PipelineResumeResponse,
+    PipelineRunRequest,
+    PipelineRunResponse,
+)
 from backend.app.schemas.ranking import (
+    HealthResponse,
     ProfileGapRequest,
+    ProfileGapResponse,
     RankCandidatesRequest,
+    RankCandidatesResponse,
     RerankShortlistRequest,
+    RerankShortlistResponse,
     SaveRankingsRequest,
+    SaveRankingsResponse,
+    UploadRankCandidatesResponse,
 )
 from backend.app.services.profile_gap_service import analyze_profile_gap
 from backend.app.services.ranking_service import rank_candidates_for_jd
@@ -22,7 +38,7 @@ app = FastAPI(
 )
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health_check():
     return {
         "status": "ok",
@@ -30,7 +46,7 @@ def health_check():
     }
 
 
-@app.post("/rank-candidates")
+@app.post("/rank-candidates", response_model=RankCandidatesResponse)
 def rank_candidates(request: RankCandidatesRequest):
     return rank_candidates_for_jd(
         jd=request.jd,
@@ -38,7 +54,7 @@ def rank_candidates(request: RankCandidatesRequest):
     )
 
 
-@app.post("/rerank-shortlist")
+@app.post("/rerank-shortlist", response_model=RerankShortlistResponse)
 def rerank_shortlist(request: RerankShortlistRequest):
     return rerank_shortlist_for_jd(
         jd=request.jd,
@@ -48,7 +64,7 @@ def rerank_shortlist(request: RerankShortlistRequest):
     )
 
 
-@app.post("/analyze-profile-gap")
+@app.post("/analyze-profile-gap", response_model=ProfileGapResponse)
 def profile_gap(request: ProfileGapRequest):
     return analyze_profile_gap(
         jd=request.jd,
@@ -57,7 +73,7 @@ def profile_gap(request: ProfileGapRequest):
     )
 
 
-@app.post("/save-rankings")
+@app.post("/save-rankings", response_model=SaveRankingsResponse)
 def save_rankings(request: SaveRankingsRequest):
     from backend.app.services.persistence_service import save_rankings_payload
 
@@ -68,7 +84,7 @@ def save_rankings(request: SaveRankingsRequest):
     )
 
 
-@app.post("/upload/rank-candidates")
+@app.post("/upload/rank-candidates", response_model=UploadRankCandidatesResponse)
 async def upload_rank_candidates(
     jd_file: UploadFile = File(...),
     resume_files: list[UploadFile] = File(...),
@@ -91,3 +107,56 @@ async def upload_rank_candidates(
     ranking = rank_candidates_for_jd(jd=jd, candidates=batch["candidates"])
     ranking["parse_failures"] = batch["failures"]
     return ranking
+
+
+@app.post("/pipeline/run", response_model=PipelineRunResponse)
+def run_pipeline(request: PipelineRunRequest):
+    thread_id = request.thread_id or str(uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
+
+    result = pipeline_graph.invoke(
+        {
+            "jd": request.jd,
+            "candidates": request.candidates,
+            "run_name": request.run_name,
+            "source_file": request.source_file,
+            "top_n": request.top_n,
+        },
+        config=config,
+    )
+
+    review_payload = extract_interrupt_payload(result)
+    if review_payload is not None:
+        return PipelineRunResponse(
+            thread_id=thread_id,
+            status="awaiting_review",
+            batch_ranking=result.get("batch_ranking"),
+            review_payload=review_payload,
+        )
+
+    return PipelineRunResponse(
+        thread_id=thread_id,
+        status=result.get("status", "no_eligible_candidates"),
+        batch_ranking=result.get("batch_ranking"),
+    )
+
+
+@app.post("/pipeline/resume", response_model=PipelineResumeResponse)
+def resume_pipeline(request: PipelineResumeRequest):
+    config = {"configurable": {"thread_id": request.thread_id}}
+    decision = {
+        "action": request.action,
+        "manual_additions": [addition.model_dump() for addition in request.manual_additions],
+        "edited_results": request.edited_results,
+        "reviewer": request.reviewer,
+        "notes": request.notes,
+    }
+
+    result = pipeline_graph.invoke(Command(resume=decision), config=config)
+
+    return PipelineResumeResponse(
+        thread_id=request.thread_id,
+        status=result.get("status"),
+        reranked=result.get("reranked"),
+        persistence_result=result.get("persistence_result"),
+    )

@@ -25,3 +25,43 @@ class SaveRankingsRequest(BaseModel):
     rankings: dict[str, Any]
     run_name: str = "API screening run"
     source_file: str = "api_payload"
+
+
+class HealthResponse(BaseModel):
+    status: str
+    service: str
+
+
+class RankCandidatesResponse(BaseModel):
+    job_title: str | None
+    ranking_rule: str
+    summary: list[dict[str, Any]]
+    results: list[dict[str, Any]]
+
+
+class RerankShortlistResponse(BaseModel):
+    job_title: str | None
+    ranking_rule: str
+    shortlist_size: int
+    summary: list[dict[str, Any]]
+    results: list[dict[str, Any]]
+
+
+class ProfileGapResponse(BaseModel):
+    target_role: str | None
+    candidate_name: str
+    current_fit: str
+    role_readiness_score: float | int | None
+    eligibility: dict[str, Any]
+    qualification_gaps: dict[str, Any]
+    recommended_actions: dict[str, Any]
+    evidence: dict[str, Any]
+
+
+class SaveRankingsResponse(BaseModel):
+    run_id: int
+    saved_rankings: int
+
+
+class UploadRankCandidatesResponse(RankCandidatesResponse):
+    parse_failures: list[dict[str, Any]] = []

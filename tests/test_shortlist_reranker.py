@@ -1,4 +1,11 @@
-from shortlist_reranker import build_shortlist_payload, candidate_lookup, merge_rerank_results
+import shortlist_reranker
+from shortlist_reranker import (
+    build_shortlist_payload,
+    candidate_lookup,
+    merge_rerank_results,
+    rerank_experience_relevance,
+)
+from tests._fakes import FakeGenAIClient
 
 
 def test_candidate_lookup_indexes_by_name():
@@ -51,3 +58,32 @@ def test_merge_rerank_results_blends_scores_and_ranks():
     # Alice's blended score (88) beats Bob's (54) despite lower first-pass rank.
     assert merged[0]["candidate_name"] == "Alice"
     assert merged[0]["final_rank"] == 1
+
+
+def test_rerank_experience_relevance_success_parses_response(monkeypatch):
+    fake_text = (
+        '[{"candidate_name": "Alice", "experience_relevance_score": 88, '
+        '"seniority_fit": "strong", "domain_fit": "strong", "reason": "Relevant.", '
+        '"matched": [], "missing": [], "evidence": []}]'
+    )
+    monkeypatch.setattr(shortlist_reranker, "client", FakeGenAIClient(response_text=fake_text))
+
+    shortlist_payload = [{"candidate_name": "Alice", "first_pass_overall_score": 80}]
+    results = rerank_experience_relevance(shortlist_payload, {"job_title": "Backend Engineer"})
+
+    assert results[0]["experience_relevance_score"] == 88
+
+
+def test_rerank_experience_relevance_malformed_json_falls_back_to_first_pass_score(monkeypatch):
+    monkeypatch.setattr(shortlist_reranker, "client", FakeGenAIClient(response_text="not json"))
+
+    shortlist_payload = [
+        {"candidate_name": "Alice", "first_pass_overall_score": 80},
+        {"candidate_name": "Bob", "first_pass_overall_score": 65},
+    ]
+    results = rerank_experience_relevance(shortlist_payload, {"job_title": "Backend Engineer"})
+
+    for item in results:
+        source = next(c for c in shortlist_payload if c["candidate_name"] == item["candidate_name"])
+        assert item["experience_relevance_score"] == source["first_pass_overall_score"]
+        assert item["seniority_fit"] == "not_evaluated"

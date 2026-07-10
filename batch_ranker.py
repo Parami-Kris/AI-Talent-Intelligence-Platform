@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import re
 from datetime import date
 
@@ -11,6 +12,10 @@ from matcher import (
     overall_match,
     skill_match,
 )
+
+from backend.app.utils.llm_json import parse_llm_json
+
+logger = logging.getLogger(__name__)
 
 
 MONTHS = {
@@ -161,8 +166,18 @@ Return ONLY valid JSON as a list. Return one result per candidate, preserving ca
 ]
 """
     response = client.models.generate_content(model=MODEL_ID, contents=prompt)
-    cleaned = response.text.replace("```json", "").replace("```", "").strip()
-    results = json.loads(cleaned)
+    raw = parse_llm_json(response.text)
+
+    if isinstance(raw, dict) and "error" in raw:
+        logger.error("Batch education match failed to parse LLM response: %s", raw["error"])
+        return [
+            default_education_result(
+                "Education evaluation could not be completed due to a parsing error; treated as not evaluated."
+            )
+            for _ in candidates
+        ]
+
+    results = raw if isinstance(raw, list) else []
 
     by_index = {
         item.get("candidate_index"): item

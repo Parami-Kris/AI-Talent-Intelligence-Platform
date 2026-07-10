@@ -31,15 +31,20 @@ def test_parse_resume_upload_raises_on_llm_error(monkeypatch):
         assert "broken.pdf" in str(exc)
 
 
-def test_parse_jd_upload_raises_on_empty_result(monkeypatch):
+def test_parse_jd_upload_raises_on_llm_error(monkeypatch):
     monkeypatch.setattr(intake, "extract_text_from_upload", lambda content, filename: "jd text")
-    monkeypatch.setattr(intake, "extract_structured_jd", lambda text: {})
+    monkeypatch.setattr(
+        intake,
+        "extract_structured_jd",
+        lambda text: {"error": "bad json", "raw_response": "not json"},
+    )
 
     try:
         intake.parse_jd_upload(b"bytes", "jd.txt")
         assert False, "expected ValueError"
-    except ValueError:
-        pass
+    except ValueError as exc:
+        assert "jd.txt" in str(exc)
+        assert "bad json" in str(exc)
 
 
 def test_parse_resumes_batch_isolates_failures(monkeypatch):

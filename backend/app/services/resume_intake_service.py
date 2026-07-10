@@ -36,8 +36,8 @@ def parse_jd_upload(content: bytes, filename: str) -> dict[str, Any]:
     text = extract_text_from_upload(content, filename)
     jd = extract_structured_jd(text)
 
-    if not jd:
-        raise ValueError(f"Failed to parse job description '{filename}'.")
+    if "error" in jd:
+        raise ValueError(f"Failed to parse job description '{filename}': {jd['error']}")
 
     return jd
 

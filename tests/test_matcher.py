@@ -1,10 +1,15 @@
+import matcher
 from matcher import (
+    analyze_match,
     contains_skill_text,
+    education_match,
     eligibility_match,
+    experience_match,
     normalize_skill,
     overall_match,
     skill_match,
 )
+from tests._fakes import FakeGenAIClient
 
 
 def test_normalize_skill_strips_punctuation_and_case():
@@ -69,3 +74,70 @@ def test_overall_match_weights_with_education():
     result = overall_match(skill_result, edu_result, exp_result)
 
     assert result["overall_score"] == round(80 * 0.5 + 100 * 0.2 + 60 * 0.3, 2)
+
+
+def test_education_match_success_parses_response(monkeypatch):
+    fake_text = (
+        '{"score": 90, "status": "matched", "reason": "Meets requirement.", '
+        '"matched": ["Bachelor\'s degree"], "missing": [], "evidence": ["BSc Computer Science"]}'
+    )
+    monkeypatch.setattr(matcher, "client", FakeGenAIClient(response_text=fake_text))
+
+    result = education_match(
+        {"education": [{"degree": "BSc Computer Science"}]},
+        {"education_required": "Bachelor's degree"},
+    )
+
+    assert result["score"] == 90
+    assert result["status"] == "matched"
+
+
+def test_education_match_malformed_json_returns_error_dict(monkeypatch):
+    monkeypatch.setattr(matcher, "client", FakeGenAIClient(response_text="not json"))
+
+    result = education_match(
+        {"education": [{"degree": "BSc Computer Science"}]},
+        {"education_required": "Bachelor's degree"},
+    )
+
+    assert "error" in result
+    assert result["raw_response"] == "not json"
+
+
+def test_experience_match_success_parses_response(monkeypatch):
+    fake_text = (
+        '{"score": 85, "relevance": "High", "years_experience": 3, '
+        '"matches_requirements": true, "matched": [], "missing": [], "evidence": []}'
+    )
+    monkeypatch.setattr(matcher, "client", FakeGenAIClient(response_text=fake_text))
+
+    result = experience_match({"experience": []}, {"experience_required": "2 years"})
+
+    assert result["score"] == 85
+    assert result["matches_requirements"] is True
+
+
+def test_experience_match_malformed_json_returns_error_dict(monkeypatch):
+    monkeypatch.setattr(matcher, "client", FakeGenAIClient(response_text="not json"))
+
+    result = experience_match({"experience": []}, {"experience_required": "2 years"})
+
+    assert "error" in result
+
+
+def test_analyze_match_success_parses_response(monkeypatch):
+    fake_text = '{"overall_fit": "High", "strengths": ["Strong Python"], "weaknesses": []}'
+    monkeypatch.setattr(matcher, "client", FakeGenAIClient(response_text=fake_text))
+
+    result = analyze_match({}, {}, {})
+
+    assert result["overall_fit"] == "High"
+    assert result["strengths"] == ["Strong Python"]
+
+
+def test_analyze_match_malformed_json_returns_error_dict(monkeypatch):
+    monkeypatch.setattr(matcher, "client", FakeGenAIClient(response_text="not json"))
+
+    result = analyze_match({}, {}, {})
+
+    assert "error" in result

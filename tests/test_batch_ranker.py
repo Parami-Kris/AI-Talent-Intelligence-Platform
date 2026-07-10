@@ -1,6 +1,8 @@
 import pytest
 
+import batch_ranker
 from batch_ranker import (
+    batch_education_match,
     batch_experience_match,
     build_summary,
     duration_years,
@@ -8,6 +10,7 @@ from batch_ranker import (
     rank_candidates,
     ranking_key,
 )
+from tests._fakes import FakeGenAIClient
 
 
 def test_minimum_required_years_parses_leading_number():
@@ -90,3 +93,37 @@ def test_rank_candidates_orders_eligible_first_without_llm_calls():
     summary = build_summary(ranked)
     assert summary[0]["rank"] == 1
     assert ranking_key(ranked[0]) > ranking_key(ranked[1])
+
+
+def test_batch_education_match_success_parses_response(monkeypatch):
+    fake_text = (
+        '[{"candidate_index": 0, "candidate_name": "Alice", "score": 100, '
+        '"status": "matched", "reason": "Meets requirement.", '
+        '"matched": ["Bachelor\'s degree"], "missing": [], "evidence": []}]'
+    )
+    monkeypatch.setattr(batch_ranker, "client", FakeGenAIClient(response_text=fake_text))
+
+    candidates = [{"name": "Alice", "education": [{"degree": "BSc"}]}]
+    jd = {"education_required": "Bachelor's degree"}
+
+    results = batch_education_match(candidates, jd)
+
+    assert results[0]["score"] == 100
+    assert results[0]["status"] == "matched"
+
+
+def test_batch_education_match_malformed_json_falls_back_to_default_for_all_candidates(monkeypatch):
+    monkeypatch.setattr(batch_ranker, "client", FakeGenAIClient(response_text="not json"))
+
+    candidates = [
+        {"name": "Alice", "education": [{"degree": "BSc"}]},
+        {"name": "Bob", "education": [{"degree": "MSc"}]},
+    ]
+    jd = {"education_required": "Bachelor's degree"}
+
+    results = batch_education_match(candidates, jd)
+
+    assert len(results) == 2
+    for result in results:
+        assert result["status"] == "not_specified"
+        assert result["score"] is None
