@@ -1,8 +1,8 @@
 from typing import Any
 
-from jd_parser import extract_structured_jd
-from llm_parser import extract_structured_resume
-from parser import extract_email, extract_links, extract_phone
+from pipeline.jd_parser import extract_structured_jd
+from pipeline.llm_parser import extract_structured_resume
+from pipeline.parser import extract_email, extract_links, extract_phone
 
 from backend.app.services.input_service import extract_text_from_upload
 

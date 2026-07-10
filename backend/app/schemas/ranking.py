@@ -65,3 +65,9 @@ class SaveRankingsResponse(BaseModel):
 
 class UploadRankCandidatesResponse(RankCandidatesResponse):
     parse_failures: list[dict[str, Any]] = []
+
+
+class ParseUploadResponse(BaseModel):
+    jd: dict[str, Any]
+    candidates: list[dict[str, Any]]
+    failures: list[dict[str, Any]] = []

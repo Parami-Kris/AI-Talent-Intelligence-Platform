@@ -1,4 +1,4 @@
-from parser import extract_email, extract_links, extract_phone
+from pipeline.parser import extract_email, extract_links, extract_phone
 
 
 def test_extract_email_finds_first_address():

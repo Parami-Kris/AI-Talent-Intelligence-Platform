@@ -1,5 +1,5 @@
-import shortlist_reranker
-from shortlist_reranker import (
+from pipeline import shortlist_reranker
+from pipeline.shortlist_reranker import (
     build_shortlist_payload,
     candidate_lookup,
     merge_rerank_results,

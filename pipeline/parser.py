@@ -1,5 +1,5 @@
 from docling.document_converter import DocumentConverter
-from llm_parser import extract_structured_resume
+from pipeline.llm_parser import extract_structured_resume
 import re
 import json
 import logging

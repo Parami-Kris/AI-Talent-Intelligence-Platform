@@ -1,7 +1,7 @@
 from typing import Any
 
-from batch_ranker import batch_experience_match
-from matcher import eligibility_match, skill_match
+from pipeline.batch_ranker import batch_experience_match
+from pipeline.matcher import eligibility_match, skill_match
 
 
 def analyze_profile_gap(

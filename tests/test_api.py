@@ -65,7 +65,7 @@ def _candidates():
 
 
 def test_rerank_shortlist_endpoint_validates_against_response_model(monkeypatch):
-    import shortlist_reranker
+    from pipeline import shortlist_reranker
 
     batch_response = client.post(
         "/rank-candidates", json={"jd": _jd(), "candidates": _candidates()}
@@ -145,3 +145,68 @@ def test_upload_rank_candidates_endpoint_validates_against_response_model(monkey
     body = response.json()
     assert body["results"][0]["candidate_name"] == "Strong Candidate"
     assert body["parse_failures"] == []
+
+
+def test_upload_parse_endpoint_returns_parsed_jd_and_candidates(monkeypatch):
+    import backend.app.main as main_module
+
+    monkeypatch.setattr(main_module, "parse_jd_upload", lambda content, filename: _jd())
+    monkeypatch.setattr(
+        main_module, "parse_resumes_batch", lambda files: {"candidates": _candidates(), "failures": []}
+    )
+
+    response = client.post(
+        "/upload/parse",
+        files={
+            "jd_file": ("jd.txt", b"job description", "text/plain"),
+            "resume_files": ("resume.txt", b"resume text", "text/plain"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["jd"]["job_title"] == "Backend Engineer"
+    assert body["candidates"][0]["name"] == "Strong Candidate"
+    assert body["failures"] == []
+
+
+def test_upload_parse_endpoint_returns_422_on_jd_parse_failure(monkeypatch):
+    import backend.app.main as main_module
+
+    def fake_parse_jd_upload(content, filename):
+        raise ValueError(f"Failed to parse job description '{filename}': bad json")
+
+    monkeypatch.setattr(main_module, "parse_jd_upload", fake_parse_jd_upload)
+
+    response = client.post(
+        "/upload/parse",
+        files={
+            "jd_file": ("jd.txt", b"job description", "text/plain"),
+            "resume_files": ("resume.txt", b"resume text", "text/plain"),
+        },
+    )
+
+    assert response.status_code == 422
+    assert "bad json" in response.json()["detail"]
+
+
+def test_upload_parse_endpoint_returns_422_when_no_resumes_parsed(monkeypatch):
+    import backend.app.main as main_module
+
+    monkeypatch.setattr(main_module, "parse_jd_upload", lambda content, filename: _jd())
+    monkeypatch.setattr(
+        main_module,
+        "parse_resumes_batch",
+        lambda files: {"candidates": [], "failures": [{"filename": "bad.pdf", "reason": "boom"}]},
+    )
+
+    response = client.post(
+        "/upload/parse",
+        files={
+            "jd_file": ("jd.txt", b"job description", "text/plain"),
+            "resume_files": ("bad.pdf", b"not a real pdf", "application/pdf"),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["failures"][0]["filename"] == "bad.pdf"

@@ -1,5 +1,5 @@
-import jd_parser
-from jd_parser import extract_structured_jd
+from pipeline import jd_parser
+from pipeline.jd_parser import extract_structured_jd
 from tests._fakes import FakeGenAIClient
 
 

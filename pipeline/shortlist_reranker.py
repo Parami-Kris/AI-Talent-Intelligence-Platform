@@ -2,7 +2,7 @@ import argparse
 import json
 import logging
 
-from matcher import MODEL_ID, client, jd_data
+from pipeline.matcher import MODEL_ID, client, jd_data
 
 from backend.app.utils.llm_json import parse_llm_json
 

@@ -276,9 +276,9 @@ Candidate profile + target role/JD
 
 Implemented:
 
-- `parser.py`
-- `llm_parser.py`
-- `jd_parser.py`
+- `pipeline/parser.py`
+- `pipeline/llm_parser.py`
+- `pipeline/jd_parser.py`
 - `candidate_profiles.json`
 - `parsed_jd.json`
 
@@ -293,7 +293,7 @@ Current capabilities:
 
 Implemented:
 
-- `matcher.py`
+- `pipeline/matcher.py`
 - `match_analysis.json`
 
 Current capabilities:
@@ -311,7 +311,7 @@ Current capabilities:
 Implemented:
 
 - `synthetic_candidates.json`
-- `batch_ranker.py`
+- `pipeline/batch_ranker.py`
 - `batch_rankings.json`
 
 Current capabilities:
@@ -326,7 +326,7 @@ Current capabilities:
 
 Implemented:
 
-- `shortlist_reranker.py`
+- `pipeline/shortlist_reranker.py`
 - `final_rankings.json`
 
 Current capabilities:
@@ -362,7 +362,7 @@ Implemented:
 - `backend/app/db.py`
 - `backend/app/ranking_repository.py`
 - `setup_mysql.py`
-- `save_rankings_to_mysql.py`
+- `pipeline/save_rankings_to_mysql.py`
 - `.env.example`
 
 Current capabilities:
@@ -447,7 +447,7 @@ Done:
 - ranking logic in service modules
 - request and response schemas (Pydantic)
 - connected to the MySQL repository layer
-- shared malformed-LLM-JSON error handling (`jd_parser.py`, `matcher.py`, `batch_ranker.py`, `shortlist_reranker.py`)
+- shared malformed-LLM-JSON error handling (`pipeline/jd_parser.py`, `pipeline/matcher.py`, `pipeline/batch_ranker.py`, `pipeline/shortlist_reranker.py`)
 - mocked test coverage for the Gemini-calling functions
 
 ### Phase 2 - Multi-resume ingestion (mostly done)
@@ -458,7 +458,7 @@ Done:
 
 - `POST /upload/rank-candidates` accepts a JD file plus multiple resume files (PDF/DOCX/TXT via Docling)
 - parses each resume independently and reports failures without stopping the batch
-- reuses `parser.py` / `llm_parser.py` / `jd_parser.py` for extraction
+- reuses `pipeline/parser.py` / `pipeline/llm_parser.py` / `pipeline/jd_parser.py` for extraction
 
 Still open:
 

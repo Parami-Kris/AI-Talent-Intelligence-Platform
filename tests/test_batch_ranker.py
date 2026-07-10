@@ -1,7 +1,7 @@
 import pytest
 
-import batch_ranker
-from batch_ranker import (
+from pipeline import batch_ranker
+from pipeline.batch_ranker import (
     batch_education_match,
     batch_experience_match,
     build_summary,

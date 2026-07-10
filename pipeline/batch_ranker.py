@@ -4,7 +4,7 @@ import logging
 import re
 from datetime import date
 
-from matcher import (
+from pipeline.matcher import (
     MODEL_ID,
     client,
     eligibility_match,

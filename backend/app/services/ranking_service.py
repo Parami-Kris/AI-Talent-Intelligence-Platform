@@ -1,6 +1,6 @@
 from typing import Any
 
-from batch_ranker import build_summary, rank_candidates
+from pipeline.batch_ranker import build_summary, rank_candidates
 
 
 def rank_candidates_for_jd(

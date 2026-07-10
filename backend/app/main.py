@@ -1,6 +1,8 @@
+import os
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 
 from backend.app.pipeline.ranking_graph import extract_interrupt_payload, pipeline_graph
@@ -12,6 +14,7 @@ from backend.app.schemas.pipeline import (
 )
 from backend.app.schemas.ranking import (
     HealthResponse,
+    ParseUploadResponse,
     ProfileGapRequest,
     ProfileGapResponse,
     RankCandidatesRequest,
@@ -35,6 +38,13 @@ app = FastAPI(
     title="AI Talent Intelligence Platform API",
     description="Backend API for recruiter ranking and job seeker qualification-gap analysis.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.environ.get("ALLOWED_ORIGIN", "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -107,6 +117,29 @@ async def upload_rank_candidates(
     ranking = rank_candidates_for_jd(jd=jd, candidates=batch["candidates"])
     ranking["parse_failures"] = batch["failures"]
     return ranking
+
+
+@app.post("/upload/parse", response_model=ParseUploadResponse)
+async def upload_parse(
+    jd_file: UploadFile = File(...),
+    resume_files: list[UploadFile] = File(...),
+):
+    jd_content = await jd_file.read()
+    try:
+        jd = parse_jd_upload(jd_content, jd_file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    files = [(await resume_file.read(), resume_file.filename) for resume_file in resume_files]
+    batch = parse_resumes_batch(files)
+
+    if not batch["candidates"]:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "No resumes could be parsed.", "failures": batch["failures"]},
+        )
+
+    return {"jd": jd, "candidates": batch["candidates"], "failures": batch["failures"]}
 
 
 @app.post("/pipeline/run", response_model=PipelineRunResponse)

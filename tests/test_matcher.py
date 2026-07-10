@@ -1,5 +1,5 @@
-import matcher
-from matcher import (
+from pipeline import matcher
+from pipeline.matcher import (
     analyze_match,
     contains_skill_text,
     education_match,

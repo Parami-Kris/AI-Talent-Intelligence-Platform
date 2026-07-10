@@ -1,6 +1,6 @@
 from typing import Any
 
-from shortlist_reranker import (
+from pipeline.shortlist_reranker import (
     build_shortlist_payload,
     build_summary,
     candidate_lookup,

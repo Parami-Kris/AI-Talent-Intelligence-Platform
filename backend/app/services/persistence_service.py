@@ -6,7 +6,7 @@ from backend.app.ranking_repository import (
     insert_screening_run,
     upsert_candidate,
 )
-from save_rankings_to_mysql import collect_evidence
+from pipeline.save_rankings_to_mysql import collect_evidence
 
 
 def save_rankings_payload(
