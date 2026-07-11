@@ -1,0 +1,29 @@
+name: Deploy backend to Hugging Face Spaces
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "pipeline/**"
+      - "requirements.txt"
+      - "Dockerfile"
+      - ".github/workflows/deploy-backend-hf-space.yml"
+  workflow_dispatch: {}
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          git remote add space "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}"
+          git push --force space HEAD:main

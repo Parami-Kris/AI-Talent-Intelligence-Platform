@@ -1,3 +1,21 @@
+---
+title: AI Talent Intelligence Platform
+emoji: 🎯
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# AI Talent Intelligence Platform
+
+FastAPI backend for resume/JD parsing, evidence-backed candidate ranking, a LangGraph
+human-in-the-loop ranking pipeline, and MySQL persistence. See `docs/PROJECT_OBJECTIVES.md`
+for the full spec and status, and `web-app/` for the recruiter dashboard frontend.
+
+## Notes on resume parsing
+
 Be careful with the phrase:
 
 "just extract the skills from resume"

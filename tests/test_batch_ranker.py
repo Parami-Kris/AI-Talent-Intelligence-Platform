@@ -127,3 +127,19 @@ def test_batch_education_match_malformed_json_falls_back_to_default_for_all_cand
     for result in results:
         assert result["status"] == "not_specified"
         assert result["score"] is None
+
+
+def test_batch_education_match_short_circuits_when_education_required_is_none():
+    # Regression: this crashed in production against a real Gemini-parsed JD
+    # that returned {"education_required": null} (present key, None value) -
+    # jd.get("education_required", "").strip() doesn't fall back to "" for a
+    # present-but-None value. No client call should happen here at all.
+    candidates = [{"name": "Alice", "education": []}, {"name": "Bob", "education": []}]
+    jd = {"education_required": None}
+
+    results = batch_education_match(candidates, jd)
+
+    assert len(results) == 2
+    for result in results:
+        assert result["status"] == "not_specified"
+        assert result["score"] is None

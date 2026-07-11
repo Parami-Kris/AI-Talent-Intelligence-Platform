@@ -5,7 +5,16 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 
-from backend.app.pipeline.ranking_graph import extract_interrupt_payload, pipeline_graph
+from backend.app.pipeline.ranking_graph import (
+    apply_review_decision,
+    extract_interrupt_payload,
+    pipeline_graph,
+)
+from backend.app.pipeline_review_repository import (
+    get_pending_review,
+    mark_review_resolved,
+    save_pending_review,
+)
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
     PipelineResumeResponse,
@@ -160,6 +169,20 @@ def run_pipeline(request: PipelineRunRequest):
 
     review_payload = extract_interrupt_payload(result)
     if review_payload is not None:
+        # Persisted *before* returning to the caller, so approve/reject/edit
+        # works whether it happens 10 seconds or 10 hours later - resume reads
+        # this row, not the in-memory LangGraph checkpoint (which won't survive
+        # a process restart/redeploy).
+        save_pending_review(
+            thread_id=thread_id,
+            jd=request.jd,
+            candidates=request.candidates,
+            batch_ranking=result.get("batch_ranking"),
+            reranked=result.get("reranked"),
+            run_name=request.run_name,
+            source_file=request.source_file,
+            top_n=request.top_n,
+        )
         return PipelineRunResponse(
             thread_id=thread_id,
             status="awaiting_review",
@@ -176,6 +199,8 @@ def run_pipeline(request: PipelineRunRequest):
 
 @app.post("/pipeline/resume", response_model=PipelineResumeResponse)
 def resume_pipeline(request: PipelineResumeRequest):
+    from backend.app.services.persistence_service import save_rankings_payload
+
     config = {"configurable": {"thread_id": request.thread_id}}
     decision = {
         "action": request.action,
@@ -185,11 +210,48 @@ def resume_pipeline(request: PipelineResumeRequest):
         "notes": request.notes,
     }
 
-    result = pipeline_graph.invoke(Command(resume=decision), config=config)
+    # Fast path: the in-memory LangGraph checkpoint is still alive (no process
+    # restart/redeploy since /pipeline/run) - resume through the graph directly
+    # and skip the MySQL read entirely. get_state() is a non-destructive check;
+    # a non-empty `next` means this thread is genuinely paused at the interrupt.
+    if pipeline_graph.get_state(config).next:
+        result = pipeline_graph.invoke(Command(resume=decision), config=config)
+        status = result.get("status", "rejected")
+        mark_review_resolved(request.thread_id, status)
+        return PipelineResumeResponse(
+            thread_id=request.thread_id,
+            status=status,
+            reranked=result.get("reranked"),
+            persistence_result=result.get("persistence_result"),
+        )
+
+    # Durable fallback: the checkpoint is gone (process restart/redeploy, or
+    # this thread was already resolved) - read the pending state persisted to
+    # MySQL at /pipeline/run time instead.
+    pending = get_pending_review(request.thread_id)
+    if pending is None:
+        raise HTTPException(status_code=404, detail=f"No pending review found for thread_id '{request.thread_id}'.")
+    if pending["status"] != "awaiting_review":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Review for thread_id '{request.thread_id}' was already resolved as '{pending['status']}'.",
+        )
+
+    if request.action not in ("approve", "edit"):
+        mark_review_resolved(request.thread_id, "rejected")
+        return PipelineResumeResponse(thread_id=request.thread_id, status="rejected", reranked=None, persistence_result=None)
+
+    reranked = apply_review_decision(pending["reranked"], pending["batch_ranking"], decision)
+    persistence_result = save_rankings_payload(
+        rankings=reranked,
+        run_name=pending["run_name"] or "LangGraph pipeline run",
+        source_file=pending["source_file"] or "langgraph_pipeline",
+    )
+    mark_review_resolved(request.thread_id, "persisted")
 
     return PipelineResumeResponse(
         thread_id=request.thread_id,
-        status=result.get("status"),
-        reranked=result.get("reranked"),
-        persistence_result=result.get("persistence_result"),
+        status="persisted",
+        reranked=reranked,
+        persistence_result=persistence_result,
     )

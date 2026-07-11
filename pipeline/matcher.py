@@ -75,10 +75,10 @@ def skill_evidence(resume, skill):
 def skill_match(resume,jd):
     resume_skills = {
         normalize_skill(skill): skill
-        for skill in resume.get("normalized_skills", [])
+        for skill in (resume.get("normalized_skills") or [])
     }
-    jd_required = set(jd.get("required_skills", []))
-    jd_preferred = set(jd.get("preferred_skills", []))
+    jd_required = set(jd.get("required_skills") or [])
+    jd_preferred = set(jd.get("preferred_skills") or [])
 
     common_skills = {
         skill for skill in jd_required
@@ -113,7 +113,7 @@ def skill_match(resume,jd):
     }
 
 def education_match(resume,jd):
-    jd_edu = jd.get("education_required", "").strip()
+    jd_edu = (jd.get("education_required") or "").strip()
     
     if not jd_edu:
         return {

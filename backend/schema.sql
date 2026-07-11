@@ -48,3 +48,17 @@ CREATE TABLE IF NOT EXISTS score_evidence (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ranking_id) REFERENCES candidate_rankings(id)
 );
+
+CREATE TABLE IF NOT EXISTS pipeline_reviews (
+    thread_id VARCHAR(64) PRIMARY KEY,
+    jd JSON NOT NULL,
+    candidates JSON NOT NULL,
+    batch_ranking JSON NOT NULL,
+    reranked JSON NOT NULL,
+    run_name VARCHAR(255),
+    source_file VARCHAR(500),
+    top_n INT,
+    status VARCHAR(20) NOT NULL DEFAULT 'awaiting_review',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL
+);

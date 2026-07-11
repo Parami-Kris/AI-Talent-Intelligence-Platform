@@ -43,10 +43,7 @@ def rerank_node(state: PipelineState) -> dict:
     return {"reranked": reranked, "status": "reranked"}
 
 
-def human_review_node(state: PipelineState) -> dict:
-    reranked = state["reranked"]
-    batch_ranking = state["batch_ranking"]
-
+def build_review_payload(reranked: dict, batch_ranking: dict) -> dict:
     # rerank_shortlist_for_jd carries *every* first-pass candidate forward into
     # "results"/"summary" - top_n only controls who actually gets an LLM relevance
     # call, not who's present in the output. So "shortlisted" vs "everyone else" is
@@ -55,30 +52,31 @@ def human_review_node(state: PipelineState) -> dict:
     shortlisted = [item for item in summary if item.get("experience_relevance_score") is not None]
     other_candidates = [item for item in summary if item.get("experience_relevance_score") is None]
 
-    decision = interrupt(
-        {
-            "type": "shortlist_review",
-            "job_title": reranked.get("job_title"),
-            "shortlist_size": reranked.get("shortlist_size"),
-            "shortlist": shortlisted,
-            "other_candidates": other_candidates,
-            "message": (
-                "Review the shortlist. Resume with action='approve' to persist as-is, "
-                "action='edit' (optionally with manual_additions and/or edited_results) "
-                "to persist a modified list, or action='reject' to discard this run. "
-                "manual_additions lets you flag a candidate from other_candidates "
-                "(e.g. one who interviewed well but wasn't LLM-shortlisted) with a reason."
-            ),
-        }
-    )
+    return {
+        "type": "shortlist_review",
+        "job_title": reranked.get("job_title"),
+        "shortlist_size": reranked.get("shortlist_size"),
+        "shortlist": shortlisted,
+        "other_candidates": other_candidates,
+        "message": (
+            "Review the shortlist. Resume with action='approve' to persist as-is, "
+            "action='edit' (optionally with manual_additions and/or edited_results) "
+            "to persist a modified list, or action='reject' to discard this run. "
+            "manual_additions lets you flag a candidate from other_candidates "
+            "(e.g. one who interviewed well but wasn't LLM-shortlisted) with a reason."
+        ),
+    }
 
-    action = decision.get("action", "reject")
-    updates: dict[str, Any] = {"review_decision": decision}
 
-    if action != "edit":
-        updates["status"] = "approved" if action == "approve" else "rejected"
-        return updates
+def apply_review_decision(reranked: dict, batch_ranking: dict, decision: dict) -> dict:
+    """Applies an approve/edit/reject decision to a reranked payload.
 
+    Pure function (no graph/state dependency) so it can be reused both by
+    human_review_node (same-process resume via the graph) and by the
+    MySQL-backed /pipeline/resume route (durable resume, works even after a
+    process restart - see backend/app/pipeline_review_repository.py).
+    Returns the updated reranked dict; only meaningful when action == "edit".
+    """
     results = list(reranked.get("results", []))
 
     edited_results = decision.get("edited_results")
@@ -119,7 +117,23 @@ def human_review_node(state: PipelineState) -> dict:
             results.append(new_entry)
             results_by_name[name] = new_entry
 
-    updates["reranked"] = {**reranked, "results": results}
+    return {**reranked, "results": results}
+
+
+def human_review_node(state: PipelineState) -> dict:
+    reranked = state["reranked"]
+    batch_ranking = state["batch_ranking"]
+
+    decision = interrupt(build_review_payload(reranked, batch_ranking))
+
+    action = decision.get("action", "reject")
+    updates: dict[str, Any] = {"review_decision": decision}
+
+    if action != "edit":
+        updates["status"] = "approved" if action == "approve" else "rejected"
+        return updates
+
+    updates["reranked"] = apply_review_decision(reranked, batch_ranking, decision)
     updates["status"] = "approved"
     return updates
 

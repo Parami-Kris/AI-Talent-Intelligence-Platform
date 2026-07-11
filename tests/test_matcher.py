@@ -43,6 +43,21 @@ def test_skill_match_handles_no_requirements():
     assert result["score"] == 0
 
 
+def test_skill_match_handles_none_values_from_llm_jd_parse():
+    # The JD parser (Gemini) can return `null` for a field instead of omitting
+    # it or using an empty list/string - .get(key, default) only falls back to
+    # the default when the key is *absent*, not when its value is None, so
+    # these fields need defensive handling (regression: crashed in production
+    # with `AttributeError: 'NoneType' object has no attribute 'strip'`).
+    resume = {"normalized_skills": None}
+    jd = {"required_skills": None, "preferred_skills": None}
+
+    result = skill_match(resume, jd)
+
+    assert result["score"] == 0
+    assert result["matched"] == []
+
+
 def test_eligibility_match_flags_missing_must_haves():
     skill_result = {
         "required_skills": ["Python", "AWS"],
@@ -102,6 +117,17 @@ def test_education_match_malformed_json_returns_error_dict(monkeypatch):
 
     assert "error" in result
     assert result["raw_response"] == "not json"
+
+
+def test_education_match_short_circuits_when_education_required_is_none():
+    # Regression: jd.get("education_required", "").strip() crashed with
+    # AttributeError when the JD parser returned {"education_required": null}
+    # instead of omitting the key or using "" - the key IS present, so the
+    # default never kicks in. No client call should happen here at all.
+    result = education_match({"education": []}, {"education_required": None})
+
+    assert result["score"] is None
+    assert result["status"] == "not_specified"
 
 
 def test_experience_match_success_parses_response(monkeypatch):

@@ -26,11 +26,15 @@ This should demonstrate:
 
 ### Frontend
 
+Current:
+
+- Vite + React + TypeScript (`web-app/`) for the recruiter dashboard
+- TailwindCSS
+
 Planned:
 
-- React or Next.js
-- TailwindCSS
-- Recharts or Chart.js for analytics
+- job seeker / profile-gap dashboard (second route in `web-app/`)
+- Recharts or Chart.js for analytics, once there's an analytics view to build
 
 ### Backend
 
@@ -80,11 +84,15 @@ Reason:
 
 ### Deployment
 
-Planned later:
+Chosen:
 
-- Docker Compose for local reproducibility
-- frontend deployment on Vercel/Netlify
-- backend deployment on Render/Railway/Fly.io if free/affordable
+- frontend: GitHub Pages (`web-app/`), auto-deployed via `.github/workflows/deploy-web-app.yml` on push to `main`
+- backend: Hugging Face Spaces (Docker SDK) — tried Render first, but its free tier's 512MB RAM / 0.1 CPU can't reliably run Docling's dependency chain (`torch`/`transformers`/`docling-ibm-models`); HF Spaces' free CPU tier has much more headroom and doesn't require a card on file
+
+Not chosen:
+
+- Render for the backend — kept `render.yaml` in the repo in case a paid tier is worth it later, but not the current path
+- Docker Compose for local dev — not needed yet; local dev runs backend/frontend directly, only the HF Spaces deploy is containerized
 
 AWS is optional and not required for the first strong demo.
 
@@ -351,7 +359,7 @@ Current capabilities:
 - conditional edge that skips reranking/persistence entirely when zero candidates are eligible
 - human-in-the-loop interrupt before persistence: a recruiter can `approve` the shortlist as-is, `reject` the run, or `edit` it
 - editing supports `manual_additions` — flagging a candidate who wasn't LLM-shortlisted (e.g. one who interviewed well but whose resume underrepresented them) with a required `override_reason`, so the persisted record still carries evidence for the override
-- resumable via LangGraph's `interrupt()`/`Command(resume=...)` pattern with an `InMemorySaver` checkpointer keyed by `thread_id` (in-process/dev-only; a durable checkpointer is a natural swap if persistence across restarts is needed)
+- `/pipeline/run` uses LangGraph's `interrupt()` to pause for review, but resume is durable: the moment the interrupt fires, the full pending state (JD, candidates, batch ranking, reranked shortlist) is persisted to a `pipeline_reviews` MySQL table (`backend/app/pipeline_review_repository.py`) *before* the response is returned. `/pipeline/resume` reads from that table — not from LangGraph's in-memory checkpoint — so approve/edit/reject works correctly whether it happens seconds or hours later, and survives a full backend process restart (verified manually: killed the process mid-review, restarted it, resumed successfully against the same `thread_id`). The decision-application logic (`apply_review_decision`) is a pure function shared between the graph's own `human_review_node` and the durable resume route, so there's one source of truth for the manual-add/edit behavior either way.
 - additive: `/rank-candidates`, `/rerank-shortlist`, `/save-rankings` are unchanged
 
 ### MySQL foundation
@@ -424,16 +432,16 @@ The project has a working AI pipeline prototype (including a LangGraph-orchestra
 
 Major missing pieces:
 
-- actual frontend website
-- UI/UX
-- Docker setup
+- job seeker / profile-gap dashboard (recruiter dashboard exists; see `web-app/`)
+- further UI/UX polish
 - evaluation/benchmarking against a labeled dataset
 - documentation and demo assets
-- a durable (non-in-memory) checkpointer for the LangGraph pipeline if it needs to survive process restarts
 
 ## Known Issues
 
 - (Resolved) The repo previously had no commits. It now has an initial commit and is pushed to `https://github.com/Parami-Kris/AI-Talent-Intelligence-Platform`.
+- (Resolved) The LangGraph pipeline's resume step used to depend on an in-memory checkpointer that wouldn't survive a process restart. Fixed via a durable `pipeline_reviews` MySQL table — see the LangGraph section above.
+- (Resolved) Render's free tier couldn't run the backend — Docling's dependency chain (`torch`/`transformers`/`docling-ibm-models`) is too heavy for its 512MB RAM / 0.1 CPU, causing either OOM kills or startup timeouts. Moved backend hosting to Hugging Face Spaces (Docker SDK), which has much more headroom on its free CPU tier.
 
 ## Next Engineering Tasks
 

@@ -124,7 +124,7 @@ def default_education_result(reason):
 
 
 def batch_education_match(candidates, jd):
-    jd_edu = jd.get("education_required", "").strip()
+    jd_edu = (jd.get("education_required") or "").strip()
     if not jd_edu:
         return [
             default_education_result("The job description does not specify an education requirement.")
