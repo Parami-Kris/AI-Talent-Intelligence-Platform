@@ -6,6 +6,8 @@ import type {
   ParseUploadResponse,
   PipelineResumeResponse,
   PipelineRunResponse,
+  ProfileGapRequest,
+  ProfileGapResponse,
 } from './types'
 
 export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadResponse> {
@@ -35,4 +37,8 @@ export interface ResumePipelinePayload {
 
 export function resumePipeline(payload: ResumePipelinePayload): Promise<PipelineResumeResponse> {
   return postJson<PipelineResumeResponse>('/pipeline/resume', payload)
+}
+
+export function analyzeProfileGap(payload: ProfileGapRequest): Promise<ProfileGapResponse> {
+  return postJson<ProfileGapResponse>('/analyze-profile-gap', payload)
 }

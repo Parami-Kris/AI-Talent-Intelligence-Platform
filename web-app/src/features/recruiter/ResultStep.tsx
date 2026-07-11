@@ -1,5 +1,5 @@
 import type { BatchRankingResult, PersistenceResult, RerankedResult } from '../../api/types'
-import { CandidateTable } from './components/CandidateTable'
+import { CandidateResultsView } from './components/CandidateResultsView'
 
 interface ResultStepProps {
   status: 'persisted' | 'rejected'
@@ -32,7 +32,7 @@ export function ResultStep({ status, reranked, persistenceResult, onStartNew }: 
           <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Final results
           </h3>
-          <CandidateTable
+          <CandidateResultsView
             rows={reranked.summary}
             extraColumns={[
               {
@@ -63,7 +63,7 @@ export function NoEligibleStep({ batchRanking, onStartNew }: NoEligibleStepProps
         <strong>{batchRanking.job_title ?? 'this role'}</strong> — the shortlist reranking step was skipped.
       </div>
 
-      <CandidateTable rows={batchRanking.summary} emptyMessage="No candidates were ranked." />
+      <CandidateResultsView rows={batchRanking.summary} emptyMessage="No candidates were ranked." />
 
       <button
         type="button"

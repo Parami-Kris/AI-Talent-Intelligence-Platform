@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { JobSeekerPage } from './routes/JobSeekerPage'
 import { RecruiterPage } from './routes/RecruiterPage'
 
 function NotFoundPage() {
@@ -12,6 +13,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/recruiter" replace />} />
         <Route path="/recruiter" element={<RecruiterPage />} />
+        <Route path="/job-seeker" element={<JobSeekerPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Layout>

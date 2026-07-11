@@ -133,3 +133,41 @@ export interface PipelineResumeResponse {
 }
 
 export type PipelineAction = 'approve' | 'edit' | 'reject'
+
+export interface ProfileGapRequest {
+  jd: Jd
+  candidate: Candidate
+  target_role?: string | null
+}
+
+export interface QualificationGaps {
+  missing_required_skills: string[]
+  missing_experience_signals: string[]
+  matched_skills: string[]
+}
+
+export interface RecommendedActions {
+  suggested_projects: string[]
+  resume_improvements: string[]
+  learning_focus: string[]
+}
+
+export interface ProfileGapEvidence {
+  skills: string[]
+  experience: string[]
+}
+
+export interface ProfileGapResponse {
+  target_role: string | null
+  candidate_name: string
+  current_fit: 'strong' | 'partial' | 'weak'
+  role_readiness_score: number | null
+  eligibility: {
+    meets_experience: boolean
+    missing_must_haves: string[]
+    [key: string]: unknown
+  }
+  qualification_gaps: QualificationGaps
+  recommended_actions: RecommendedActions
+  evidence: ProfileGapEvidence
+}

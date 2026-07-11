@@ -11,7 +11,7 @@ import type {
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { ActionBar } from './components/ActionBar'
 import { CandidateDetailDrawer } from './components/CandidateDetailDrawer'
-import { CandidateTable } from './components/CandidateTable'
+import { CandidateResultsView } from './components/CandidateResultsView'
 import { ManualAddModal } from './components/ManualAddModal'
 import { ScoreBadge } from './components/EligibilityBadge'
 
@@ -66,7 +66,7 @@ export function ReviewStep({ threadId, batchRanking, reviewPayload, onResumed }:
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Shortlisted — LLM reranked ({reviewPayload.shortlist.length})
         </h3>
-        <CandidateTable
+        <CandidateResultsView
           rows={reviewPayload.shortlist}
           onRowClick={setDetailRow}
           extraColumns={[
@@ -82,7 +82,7 @@ export function ReviewStep({ threadId, batchRanking, reviewPayload, onResumed }:
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Other candidates — first-pass only ({reviewPayload.other_candidates.length})
         </h3>
-        <CandidateTable
+        <CandidateResultsView
           rows={reviewPayload.other_candidates}
           onRowClick={setDetailRow}
           emptyMessage="Every candidate made the shortlist."
