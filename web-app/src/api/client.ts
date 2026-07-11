@@ -41,6 +41,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export function getJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined) query.set(key, String(value))
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return request<T>(`${path}${suffix}`)
+}
+
 export function postJson<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: 'POST',

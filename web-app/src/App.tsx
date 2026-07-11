@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { JobSearchResultsPage } from './features/job-seeker/JobSearchResultsPage'
 import { JobSeekerPage } from './routes/JobSeekerPage'
 import { RecruiterPage } from './routes/RecruiterPage'
 
@@ -14,6 +15,7 @@ function App() {
         <Route path="/" element={<Navigate to="/recruiter" replace />} />
         <Route path="/recruiter" element={<RecruiterPage />} />
         <Route path="/job-seeker" element={<JobSeekerPage />} />
+        <Route path="/job-seeker/search" element={<JobSearchResultsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Layout>

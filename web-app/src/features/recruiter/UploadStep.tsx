@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, detailMessage } from '../../api/client'
 import { parseUpload, runPipeline } from '../../api/endpoints'
 import type { Candidate, Jd, PipelineRunResponse } from '../../api/types'
@@ -70,6 +70,22 @@ export function UploadStep({ onPipelineRun }: UploadStepProps) {
   }
 
   const isBusy = phase !== 'idle'
+
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!isBusy) {
+      setElapsedSeconds(0)
+      return
+    }
+    const startedAt = Date.now()
+    const id = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [isBusy])
+
+  const resumeCount = resumeFiles.length || 1
+  const estimateLow = resumeCount * 8
+  const estimateHigh = resumeCount * 15 + 10
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -144,7 +160,13 @@ export function UploadStep({ onPipelineRun }: UploadStepProps) {
         </button>
 
         {isBusy && (
-          <LoadingSpinner label={phase === 'parsing' ? 'Parsing files…' : 'Running ranking pipeline…'} />
+          <div className="space-y-1">
+            <LoadingSpinner label={phase === 'parsing' ? 'Parsing files…' : 'Running ranking pipeline…'} />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {elapsedSeconds}s elapsed — usually takes about {estimateLow}–{estimateHigh}s for {resumeCount} resume
+              {resumeCount === 1 ? '' : 's'}.
+            </p>
+          </div>
         )}
       </form>
     </div>

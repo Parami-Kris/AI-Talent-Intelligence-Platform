@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS score_evidence (
     FOREIGN KEY (ranking_id) REFERENCES candidate_rankings(id)
 );
 
+CREATE TABLE IF NOT EXISTS query_expansions (
+    query_text VARCHAR(255) PRIMARY KEY,
+    related_titles JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS pipeline_reviews (
     thread_id VARCHAR(64) PRIMARY KEY,
     jd JSON NOT NULL,

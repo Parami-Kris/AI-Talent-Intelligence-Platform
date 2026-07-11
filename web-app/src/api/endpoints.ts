@@ -1,7 +1,8 @@
-import { postForm, postJson } from './client'
+import { getJson, postForm, postJson } from './client'
 import type {
   Candidate,
   Jd,
+  JobSearchResponse,
   ManualAddition,
   ParseUploadResponse,
   PipelineResumeResponse,
@@ -41,4 +42,8 @@ export function resumePipeline(payload: ResumePipelinePayload): Promise<Pipeline
 
 export function analyzeProfileGap(payload: ProfileGapRequest): Promise<ProfileGapResponse> {
   return postJson<ProfileGapResponse>('/analyze-profile-gap', payload)
+}
+
+export function searchJobs(query: string, location?: string, country = 'us', page = 1): Promise<JobSearchResponse> {
+  return getJson<JobSearchResponse>('/jobs/search', { query, location, country, page })
 }

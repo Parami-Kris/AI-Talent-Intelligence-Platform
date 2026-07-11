@@ -15,6 +15,7 @@ from backend.app.pipeline_review_repository import (
     mark_review_resolved,
     save_pending_review,
 )
+from backend.app.schemas.jobs import JobSearchResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
     PipelineResumeResponse,
@@ -34,6 +35,7 @@ from backend.app.schemas.ranking import (
     SaveRankingsResponse,
     UploadRankCandidatesResponse,
 )
+from backend.app.services.job_search_service import search_jobs as search_jobs_service
 from backend.app.services.profile_gap_service import analyze_profile_gap
 from backend.app.services.ranking_service import rank_candidates_for_jd
 from backend.app.services.reranking_service import rerank_shortlist_for_jd
@@ -81,6 +83,11 @@ def rerank_shortlist(request: RerankShortlistRequest):
         candidates=request.candidates,
         top_n=request.top_n,
     )
+
+
+@app.get("/jobs/search", response_model=JobSearchResponse)
+def search_jobs(query: str, location: str | None = None, country: str = "us", page: int = 1):
+    return search_jobs_service(query=query, location=location, country=country, page=page)
 
 
 @app.post("/analyze-profile-gap", response_model=ProfileGapResponse)

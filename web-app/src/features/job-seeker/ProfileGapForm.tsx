@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { analyzeProfileGap, parseUpload } from '../../api/endpoints'
 import { ApiError, detailMessage } from '../../api/client'
 import type { ProfileGapResponse } from '../../api/types'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { FileInput } from '../../components/FileInput'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
+import { ADZUNA_COUNTRIES } from '../../lib/adzunaCountries'
 
 interface ProfileGapFormProps {
   onResult: (result: ProfileGapResponse) => void
@@ -22,15 +24,35 @@ function segmentButtonClass(active: boolean) {
 }
 
 export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
+  const navigate = useNavigate()
   const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [jdMode, setJdMode] = useState<JdMode>('paste')
+  const [jdMode, setJdMode] = useState<JdMode>('upload')
   const [jdText, setJdText] = useState('')
   const [jdFile, setJdFile] = useState<File | null>(null)
   const [targetRole, setTargetRole] = useState('')
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  const [showJobSearch, setShowJobSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchLocation, setSearchLocation] = useState('')
+  const [searchCountry, setSearchCountry] = useState('in')
+
   const isBusy = phase !== 'idle'
+
+  const goToSearchResults = () => {
+    if (!searchQuery.trim()) return
+    const params = new URLSearchParams({ query: searchQuery.trim(), country: searchCountry })
+    if (searchLocation.trim()) params.set('location', searchLocation.trim())
+    navigate(`/job-seeker/search?${params.toString()}`)
+  }
+
+  const handleSearchKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      goToSearchResults()
+    }
+  }
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -52,7 +74,7 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
     setPhase('parsing')
     try {
       const jdFileToSend =
-        jdMode === 'paste' ? new File([jdText], 'job_description.txt', { type: 'text/plain' }) : jdFile!
+        jdMode === 'upload' ? jdFile! : new File([jdText], 'job_description.txt', { type: 'text/plain' })
       const parsed = await parseUpload(jdFileToSend, [resumeFile])
       if (parsed.candidates.length === 0) {
         setError('Could not parse your resume. Try a different file.')
@@ -75,6 +97,61 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => setShowJobSearch((current) => !current)}
+          className="w-full rounded-md border border-indigo-300 bg-indigo-50 px-4 py-2 text-center text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+        >
+          {showJobSearch ? 'Hide job search' : 'Search real jobs'}
+        </button>
+
+        {showJobSearch && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Job title or keywords"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+            />
+            <input
+              type="text"
+              value={searchLocation}
+              onChange={(event) => setSearchLocation(event.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Location (optional)"
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+            />
+            <select
+              value={searchCountry}
+              onChange={(event) => setSearchCountry(event.target.value)}
+              className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+            >
+              {ADZUNA_COUNTRIES.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={goToSearchResults}
+              className="shrink-0 rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Search
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-600">
+          <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+          <span>or</span>
+          <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
+        </div>
+      </div>
+
       <div>
         <h2 className="text-xl font-semibold">Check your fit for a role</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">

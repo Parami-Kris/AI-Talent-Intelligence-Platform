@@ -157,6 +157,23 @@ export interface ProfileGapEvidence {
   experience: string[]
 }
 
+export interface JobSearchResult {
+  source: string
+  id: string
+  title: string | null
+  company: string | null
+  location: string | null
+  description: string | null
+  url: string | null
+  posted_at: string | null
+}
+
+export interface JobSearchResponse {
+  count: number
+  results: JobSearchResult[]
+  expanded_titles: string[]
+}
+
 export interface ProfileGapResponse {
   target_role: string | null
   candidate_name: string

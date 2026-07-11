@@ -33,7 +33,6 @@ Current:
 
 Planned:
 
-- job seeker / profile-gap dashboard (second route in `web-app/`)
 - Recharts or Chart.js for analytics, once there's an analytics view to build
 
 ### Backend
@@ -426,13 +425,13 @@ Implemented:
 
 ## Current Completion Estimate
 
-Approximate status: 40-50%.
+Approximate status: 55-65%.
 
-The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, initial persistence, and a test suite that now covers the Gemini-calling code paths. It is not yet a complete product.
+The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, initial persistence, a test suite that now covers the Gemini-calling code paths, and both the recruiter dashboard and job seeker qualification-gap dashboard live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product.
 
 Major missing pieces:
 
-- job seeker / profile-gap dashboard (recruiter dashboard exists; see `web-app/`)
+- candidate comparison view and result export (recruiter dashboard)
 - further UI/UX polish
 - evaluation/benchmarking against a labeled dataset
 - documentation and demo assets
@@ -473,30 +472,22 @@ Still open:
 - a CLI equivalent (`parse_resumes_folder.py`) for local/offline batch parsing of a folder of PDFs
 - store parsed candidates (not just rankings) in MySQL
 
-### Phase 3 - Web app
+### Phase 3 - Web app (done)
 
 Goal: build a recruiter-facing interface first, then extend it into a job seeker interface.
 
-Tasks:
+Done:
 
-- create React/Next frontend
-- upload JD
-- upload resumes
-- run ranking
-- show ranking table
-- show candidate detail drawer/page
-- show evidence and missing must-haves
-- show final reranking result
+- React (Vite + TypeScript) frontend, deployed to GitHub Pages
+- upload JD / upload resumes / run ranking / show ranking table (card and table views)
+- candidate detail drawer, evidence and missing must-haves
+- final reranking result and human review flow
 
-Job seeker mode tasks:
+Job seeker mode (done):
 
-- upload own resume
-- paste target JD
-- show qualification gaps
-- show missing must-haves
-- show suggested projects
-- show resume improvement recommendations
-- show role-readiness score
+- upload own resume, with a paste-text-or-upload-file toggle for the JD
+- qualification gaps, missing must-haves, suggested projects, resume improvement recommendations, role-readiness score
+- route at `/job-seeker`, reachable from the main nav
 
 ### Phase 4 - Explainability and evaluation
 
@@ -535,9 +526,9 @@ Tasks:
 
 ## Near-Term Priority
 
-The FastAPI backend foundation (Phase 1, including the LangGraph human-in-the-loop pipeline, response schemas, malformed-JSON handling, and mocked LLM test coverage) and file-upload ingestion (Phase 2) are done. The immediate next best step is:
+Phases 1-3 are done: the FastAPI backend foundation, file-upload ingestion, and the web app (recruiter dashboard plus job seeker qualification-gap dashboard, both deployed live). The immediate next best step is:
 
-> Start the Phase 3 web app so the API has a real frontend to bridge to.
+> Phase 4 - explainability and evaluation: build a small labeled benchmark set and compare first-pass vs. reranked output, to make the ranking quality claims credible rather than anecdotal.
 
 ## Notes for Recruiter/LinkedIn Positioning
 
