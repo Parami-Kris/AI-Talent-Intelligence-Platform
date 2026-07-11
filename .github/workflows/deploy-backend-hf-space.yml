@@ -20,6 +20,13 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      # HF Spaces rejects binary files that aren't tracked via git-lfs/Xet.
+      # Rewriting this only in the CI checkout keeps origin's history untouched.
+      - name: Move binary files to LFS for the Space push
+        run: |
+          git lfs install
+          git lfs migrate import --include="Parami_Resume.pdf" --everything
+
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
