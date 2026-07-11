@@ -3,6 +3,7 @@ import { ApiError, detailMessage } from '../../api/client'
 import { parseUpload, runPipeline } from '../../api/endpoints'
 import type { Candidate, Jd, PipelineRunResponse } from '../../api/types'
 import { ErrorBanner } from '../../components/ErrorBanner'
+import { FileInput } from '../../components/FileInput'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
 import { ParseFailuresList } from './components/ParseFailuresList'
 
@@ -83,28 +84,32 @@ export function UploadStep({ onPipelineRun }: UploadStepProps) {
       <ParseFailuresList failures={failures} />
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block text-sm font-medium">
-          Job description file
-          <input
-            type="file"
+        <div>
+          <label htmlFor="jd-file" className="block text-sm font-medium">
+            Job description file
+          </label>
+          <FileInput
+            id="jd-file"
             accept=".txt,.pdf,.docx"
             disabled={isBusy || !!parsed}
-            onChange={(event) => setJdFile(event.target.files?.[0] ?? null)}
-            className="mt-1 block w-full text-sm"
+            value={jdFile ? [jdFile] : []}
+            onChange={(files) => setJdFile(files[0] ?? null)}
           />
-        </label>
+        </div>
 
-        <label className="block text-sm font-medium">
-          Resume files
-          <input
-            type="file"
+        <div>
+          <label htmlFor="resume-files" className="block text-sm font-medium">
+            Resume files
+          </label>
+          <FileInput
+            id="resume-files"
             accept=".txt,.pdf,.docx"
             multiple
             disabled={isBusy || !!parsed}
-            onChange={(event) => setResumeFiles(Array.from(event.target.files ?? []))}
-            className="mt-1 block w-full text-sm"
+            value={resumeFiles}
+            onChange={setResumeFiles}
           />
-        </label>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <label className="block text-sm font-medium">
