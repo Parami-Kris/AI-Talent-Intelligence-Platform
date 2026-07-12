@@ -1,115 +1,143 @@
+import html as html_module
 import json
 import os
 import re
+from urllib.parse import quote_plus
 
 import httpx
+from bs4 import BeautifulSoup
 
 from backend.app.query_expansion_repository import get_cached_expansion, save_expansion
 
-ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs"
-JOOBLE_BASE_URL = "https://jooble.org/api"
-REMOTIVE_BASE_URL = "https://remotive.com/api/remote-jobs"
+SERPAPI_BASE_URL = "https://serpapi.com/search"
+BRIGHT_DATA_REQUEST_URL = "https://api.brightdata.com/request"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.1-8b-instant"
 MAX_RELATED_TITLES = 3
 
 
-def _strip_html(text: str | None) -> str | None:
-    if not text:
-        return text
-    return re.sub(r"<[^>]+>", " ", text).strip()
+def _strip_tag_html(raw_tag_str: str) -> str:
+    # BeautifulSoup's get_text() unreliably returns empty strings against this
+    # page's markup (confirmed against live responses) - stringify the tag and
+    # strip markup manually instead.
+    inner = re.sub(r"^<span[^>]*>|</span>$", "", raw_tag_str)
+    inner = re.sub(r"<br\s*/?>", "\n", inner)
+    inner = re.sub(r"<[^>]+>", " ", inner)
+    return html_module.unescape(inner).strip()
 
 
-def _search_adzuna(query: str, location: str | None, country: str, page: int, results_per_page: int) -> list[dict]:
-    app_id = os.environ.get("ADZUNA_APP_ID")
-    app_key = os.environ.get("ADZUNA_APP_KEY")
-    if not app_id or not app_key:
-        return []
-
-    params = {
-        "app_id": app_id,
-        "app_key": app_key,
-        "results_per_page": results_per_page,
-        "what": query,
-        "content-type": "application/json",
-    }
-    if location:
-        params["where"] = location
-
-    try:
-        response = httpx.get(f"{ADZUNA_BASE_URL}/{country}/search/{page}", params=params, timeout=10)
-        response.raise_for_status()
-    except httpx.HTTPError:
-        return []
-
-    data = response.json()
-    return [
-        {
-            "source": "adzuna",
-            "id": str(job.get("id", "")),
-            "title": job.get("title"),
-            "company": (job.get("company") or {}).get("display_name"),
-            "location": (job.get("location") or {}).get("display_name"),
-            "description": _strip_html(job.get("description")),
-            "url": job.get("redirect_url"),
-            "posted_at": job.get("created"),
-        }
-        for job in data.get("results", [])
-    ]
-
-
-def _search_jooble(query: str, location: str | None, page: int) -> list[dict]:
-    api_key = os.environ.get("JOOBLE_API_KEY")
+def _search_serpapi(query: str, location: str | None, country: str, results_per_page: int) -> list[dict] | None:
+    """Returns None (not []) on failure/quota-exhaustion so the caller can fall back to Bright Data."""
+    api_key = os.environ.get("SERP_API_KEY")
     if not api_key:
-        return []
+        return None
 
-    payload: dict = {"keywords": query, "page": str(page)}
+    params = {"engine": "google_jobs", "q": query, "gl": country, "hl": "en", "api_key": api_key}
     if location:
-        payload["location"] = location
+        params["location"] = location
 
     try:
-        response = httpx.post(f"{JOOBLE_BASE_URL}/{api_key}", json=payload, timeout=10)
+        response = httpx.get(SERPAPI_BASE_URL, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except (httpx.HTTPError, json.JSONDecodeError):
+        return None
+
+    if "error" in data:
+        return None
+
+    results = []
+    for job in data.get("jobs_results", [])[:results_per_page]:
+        apply_options = job.get("apply_options") or []
+        url = apply_options[0]["link"] if apply_options else job.get("share_link")
+        results.append(
+            {
+                "source": "serpapi",
+                "id": str(job.get("job_id", "")),
+                "title": job.get("title"),
+                "company": job.get("company_name"),
+                "location": job.get("location"),
+                "description": job.get("description"),
+                "url": url,
+                "posted_at": (job.get("detected_extensions") or {}).get("posted_at"),
+            }
+        )
+    return results
+
+
+def _search_bright_data(query: str, location: str | None, country: str, results_per_page: int) -> list[dict]:
+    """Fallback for when SerpApi's quota is exhausted. Uses Bright Data's Web
+    Unlocker product to fetch Google's Jobs vertical (udm=8) and parses the
+    HTML directly - Google preloads full descriptions for every job on the
+    page (confirmed live), just CSS-hidden until clicked, which a plain SERP
+    API static fetch does not expose but Web Unlocker's full render does.
+    More fragile than SerpApi (tied to Google's current markup) - only used
+    as a fallback, not primary, for that reason.
+    """
+    api_key = os.environ.get("BRIGHT_DATA_API_KEY")
+    zone = os.environ.get("BRIGHT_DATA_SERP_ZONE")
+    if not api_key or not zone:
+        return []
+
+    search_text = f"{query} {location}" if location else query
+    target_url = f"https://www.google.com/search?q={quote_plus(search_text)}&gl={country}&hl=en&udm=8"
+
+    try:
+        response = httpx.post(
+            BRIGHT_DATA_REQUEST_URL,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"zone": zone, "url": target_url, "format": "raw"},
+            timeout=90,
+        )
         response.raise_for_status()
     except httpx.HTTPError:
         return []
 
-    data = response.json()
-    return [
-        {
-            "source": "jooble",
-            "id": str(job.get("id") or job.get("link", "")),
-            "title": job.get("title"),
-            "company": job.get("company"),
-            "location": job.get("location"),
-            "description": _strip_html(job.get("snippet")),
-            "url": job.get("link"),
-            "posted_at": job.get("updated"),
-        }
-        for job in data.get("jobs", [])
-    ]
-
-
-def _search_remotive(query: str) -> list[dict]:
     try:
-        response = httpx.get(REMOTIVE_BASE_URL, params={"search": query}, timeout=10)
-        response.raise_for_status()
-    except httpx.HTTPError:
+        soup = BeautifulSoup(response.text, "lxml")
+    except Exception:
         return []
 
-    data = response.json()
-    return [
-        {
-            "source": "remotive",
-            "id": str(job.get("id", "")),
-            "title": job.get("title"),
-            "company": job.get("company_name"),
-            "location": job.get("candidate_required_location"),
-            "description": _strip_html(job.get("description")),
-            "url": job.get("url"),
-            "posted_at": job.get("publication_date"),
-        }
-        for job in data.get("jobs", [])
-    ]
+    results = []
+    for description_span in soup.find_all("span", attrs={"jsname": "QAWWu"}):
+        detail_card = next((p for p in description_span.parents if p.has_attr("data-title")), None)
+        if detail_card is None:
+            continue
+
+        continuation_span = detail_card.find("span", attrs={"jsname": "ij8cu"})
+        description = _strip_tag_html(str(description_span))
+        if continuation_span:
+            description += _strip_tag_html(str(continuation_span))
+
+        outer_card = detail_card.parent
+        meta_div = outer_card.find("div", class_="aW97bd") if outer_card else None
+        company = location_text = None
+        if meta_div:
+            parts = [p.strip() for p in _strip_tag_html(str(meta_div)).split("·")]
+            if len(parts) >= 2:
+                company, location_text = parts[0], parts[1]
+
+        apply_link = None
+        if outer_card:
+            link_tag = outer_card.find("a", href=True)
+            apply_link = link_tag["href"] if link_tag else None
+
+        results.append(
+            {
+                "source": "brightdata",
+                "id": str(detail_card.get("data-encoded-docid", "")),
+                "title": detail_card.get("data-title"),
+                "company": company,
+                "location": location_text,
+                "description": description,
+                "url": apply_link,
+                "posted_at": None,
+            }
+        )
+        if len(results) >= results_per_page:
+            break
+
+    return results
 
 
 def _expand_query_via_groq(query: str) -> list[str]:
@@ -170,7 +198,6 @@ def search_jobs(
     query: str,
     location: str | None = None,
     country: str = "us",
-    page: int = 1,
     results_per_page: int = 10,
 ) -> dict:
     related_titles = expand_query(query)
@@ -179,11 +206,10 @@ def search_jobs(
     seen: set[tuple[str, str]] = set()
     results: list[dict] = []
     for search_term in all_queries:
-        batch = (
-            _search_adzuna(search_term, location, country, page, results_per_page)
-            + _search_jooble(search_term, location, page)
-            + _search_remotive(search_term)
-        )
+        batch = _search_serpapi(search_term, location, country, results_per_page)
+        if batch is None:
+            # SerpApi quota exhausted or unavailable - fall back to Bright Data.
+            batch = _search_bright_data(search_term, location, country, results_per_page)
         for job in batch:
             key = (job["source"], job["id"])
             if key in seen:

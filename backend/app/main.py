@@ -86,8 +86,8 @@ def rerank_shortlist(request: RerankShortlistRequest):
 
 
 @app.get("/jobs/search", response_model=JobSearchResponse)
-def search_jobs(query: str, location: str | None = None, country: str = "us", page: int = 1):
-    return search_jobs_service(query=query, location=location, country=country, page=page)
+def search_jobs(query: str, location: str | None = None, country: str = "us"):
+    return search_jobs_service(query=query, location=location, country=country)
 
 
 @app.post("/analyze-profile-gap", response_model=ProfileGapResponse)
