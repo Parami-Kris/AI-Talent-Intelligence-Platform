@@ -23,7 +23,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${BASE_URL}${path}`, init)
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new ApiError(0, `Could not reach the API at ${BASE_URL} — is the backend running?`)
   }
 
@@ -41,13 +42,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export function getJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+export function getJson<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+  signal?: AbortSignal,
+): Promise<T> {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value !== undefined) query.set(key, String(value))
   }
   const suffix = query.toString() ? `?${query.toString()}` : ''
-  return request<T>(`${path}${suffix}`)
+  return request<T>(`${path}${suffix}`, { signal })
 }
 
 export function postJson<T>(path: string, body: unknown): Promise<T> {

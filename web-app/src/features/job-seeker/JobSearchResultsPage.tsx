@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, detailMessage } from '../../api/client'
 import { searchJobs } from '../../api/endpoints'
@@ -18,32 +18,45 @@ export function JobSearchResultsPage() {
   const [selected, setSelected] = useState<JobSearchResult | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Cancels a still-in-flight search (rather than just ignoring its result) when a
+  // newer one starts - e.g. React StrictMode's dev-only double-invoked effect, or a
+  // user re-searching before the first call resolves. Actually aborting (not just
+  // ignoring) avoids doubling up real outbound API load against rate-limited keys.
+  const activeSearchController = useRef<AbortController | null>(null)
 
   const handleSearch = async () => {
     if (!query.trim()) {
       setError('Enter a keyword to search, e.g. "machine learning engineer".')
       return
     }
+    activeSearchController.current?.abort()
+    const controller = new AbortController()
+    activeSearchController.current = controller
+
     setError(null)
     setIsSearching(true)
     try {
-      const response = await searchJobs(query.trim(), location.trim() || undefined, country)
+      const response = await searchJobs(query.trim(), location.trim() || undefined, country, controller.signal)
       setResults(response.results)
       setExpandedTitles(response.expanded_titles)
       setSelected(response.results[0] ?? null)
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return // superseded by a newer search
       setError(err instanceof ApiError ? detailMessage(err.detail) : 'Failed to search jobs.')
     } finally {
-      setIsSearching(false)
+      if (activeSearchController.current === controller) setIsSearching(false)
     }
   }
 
   // Auto-run the search once if we arrived here with a query already picked
-  // (from the inline search bar on the main job-seeker page).
+  // (from the inline search bar on the main job-seeker page). Aborts on cleanup so
+  // StrictMode's synthetic dev-mode remount cancels the first invocation's request
+  // instead of leaving it to run to completion in the background.
   useEffect(() => {
     if (query.trim()) {
       void handleSearch()
     }
+    return () => activeSearchController.current?.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

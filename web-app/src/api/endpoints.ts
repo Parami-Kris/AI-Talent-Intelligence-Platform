@@ -44,6 +44,11 @@ export function analyzeProfileGap(payload: ProfileGapRequest): Promise<ProfileGa
   return postJson<ProfileGapResponse>('/analyze-profile-gap', payload)
 }
 
-export function searchJobs(query: string, location?: string, country = 'us'): Promise<JobSearchResponse> {
-  return getJson<JobSearchResponse>('/jobs/search', { query, location, country })
+export function searchJobs(
+  query: string,
+  location?: string,
+  country = 'us',
+  signal?: AbortSignal,
+): Promise<JobSearchResponse> {
+  return getJson<JobSearchResponse>('/jobs/search', { query, location, country }, signal)
 }
