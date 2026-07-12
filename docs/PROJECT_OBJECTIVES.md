@@ -49,9 +49,10 @@ Current/planned:
 Current:
 
 - Docling for PDF/text extraction
-- Gemini via Google Gen AI SDK for structured parsing and reasoning
+- Gemini via Google Gen AI SDK (`gemini-3.1-flash-lite` — switched from `gemini-2.5-flash`, which has a much tighter 20/day free quota vs. 500/day) for structured parsing and reasoning
 - deterministic skill overlap and eligibility checks
 - LLM-based shortlist reranking
+- Groq (`llama-3.1-8b-instant`) for job-search related-title query expansion — a separate provider from Gemini specifically so it doesn't compete for Gemini's tighter quota
 
 Potential later additions:
 
@@ -71,6 +72,8 @@ Reason:
 - aligns with existing user expertise
 - useful for recruiter-facing product persistence
 - easier to explain confidently in interviews
+
+Hosting: Aiven (production, current HF Space secrets) — being migrated to **TiDB Cloud Starter** (MySQL-compatible, no code changes needed) because Aiven's free tier auto-powers-off after a period of inactivity, which would hard-fail the app's persistence layer (rankings, pipeline review flow) if someone opens the deployed app while the DB is asleep. Schema is already created and verified working on TiDB (`ai-screening-db`); production secrets haven't been switched over yet. TiDB's own inactivity behavior isn't fully confirmed by docs (no documented auto-delete/pause policy found for the Starter tier, unlike Aiven's explicitly documented one) — worth revisiting after a few days of real-world idle time to confirm.
 
 Not chosen for now:
 
@@ -380,6 +383,7 @@ Current capabilities:
 - store candidate rankings
 - store evidence rows
 - keep full ranking JSON for audit/debugging
+- cache job-search query expansions (`query_expansions` table)
 
 ### FastAPI backend
 
@@ -403,7 +407,23 @@ Current capabilities:
 - `POST /save-rankings` (persist a ranking payload to MySQL)
 - `POST /upload/rank-candidates` (multipart upload: one JD file + multiple resume files, parses each via Docling/Gemini, ranks the batch, and reports per-resume parse failures without stopping the batch)
 - `POST /pipeline/run` / `POST /pipeline/resume` (LangGraph human-in-the-loop pipeline, see above)
+- `GET /jobs/search` (job seeker "search real jobs" feature — SerpApi primary, Bright Data Web Unlocker fallback, Groq-based related-title query expansion; see below)
 - every route now declares a Pydantic `response_model` (`backend/app/schemas/ranking.py`, `backend/app/schemas/pipeline.py`), not plain dicts
+
+### Job search (job seeker "search real jobs")
+
+Implemented:
+
+- `backend/app/services/job_search_service.py`
+- `backend/app/query_expansion_repository.py`
+- `backend/app/schemas/jobs.py`
+- `web-app/src/features/job-seeker/JobSearchResultsPage.tsx` (Indeed-style list/detail page), `JobFitCheck.tsx` (per-job "analyze your fit" using only a resume, no JD upload needed since the job's own description is used)
+
+Current capabilities:
+
+- searches SerpApi's Google Jobs engine first (full descriptions, direct apply links); automatically falls back to Bright Data (Web Unlocker product, HTML-parsed) if SerpApi fails or its free-tier quota (250/month) is exhausted — Bright Data also returns full descriptions once you know the right target (`udm=8` jobs-vertical param, not the deprecated `ibp=htl;jobs`)
+- Groq generates up to 3 related job titles per query (e.g. "ML Engineer" also searches "Applied Scientist") and fans out the search across all of them, merging/deduping results; expansions are cached in a MySQL `query_expansions` table so repeat searches don't re-call Groq
+- rejected sources, documented so they aren't re-investigated: Adzuna/Jooble (hard ~300-500 char description truncation, no API-level fix), Remotive (full descriptions but remote-jobs-only, dropped for narrower coverage), LinkedIn scraping including Bright Data's own LinkedIn dataset product (declined — ToS/legal risk), JobsPipe (worse free tier than SerpApi, requires a card)
 
 ### Malformed LLM JSON handling
 
@@ -425,9 +445,9 @@ Implemented:
 
 ## Current Completion Estimate
 
-Approximate status: 55-65%.
+Approximate status: 60-70%.
 
-The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, initial persistence, a test suite that now covers the Gemini-calling code paths, and both the recruiter dashboard and job seeker qualification-gap dashboard live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product.
+The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, initial persistence, a test suite that now covers the Gemini-calling code paths, and the recruiter dashboard, job seeker qualification-gap dashboard, and job seeker "search real jobs" feature all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product.
 
 Major missing pieces:
 
@@ -435,12 +455,14 @@ Major missing pieces:
 - further UI/UX polish
 - evaluation/benchmarking against a labeled dataset
 - documentation and demo assets
+- MySQL production hosting migration from Aiven to TiDB Cloud (schema ready, HF secrets not yet switched)
 
 ## Known Issues
 
 - (Resolved) The repo previously had no commits. It now has an initial commit and is pushed to `https://github.com/Parami-Kris/AI-Talent-Intelligence-Platform`.
 - (Resolved) The LangGraph pipeline's resume step used to depend on an in-memory checkpointer that wouldn't survive a process restart. Fixed via a durable `pipeline_reviews` MySQL table — see the LangGraph section above.
 - (Resolved) Render's free tier couldn't run the backend — Docling's dependency chain (`torch`/`transformers`/`docling-ibm-models`) is too heavy for its 512MB RAM / 0.1 CPU, causing either OOM kills or startup timeouts. Moved backend hosting to Hugging Face Spaces (Docker SDK), which has much more headroom on its free CPU tier.
+- (In progress) Aiven's free-tier MySQL auto-powers-off after inactivity, which would hard-fail the app's core persistence (not just the job-search cache, which degrades gracefully) if hit while asleep. Migrating to TiDB Cloud Starter — schema verified working there, production secrets not yet switched.
 
 ## Next Engineering Tasks
 
