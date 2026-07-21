@@ -94,7 +94,7 @@ Chosen:
 Not chosen:
 
 - Render for the backend — kept `render.yaml` in the repo in case a paid tier is worth it later, but not the current path
-- Docker Compose for local dev — not needed yet; local dev runs backend/frontend directly, only the HF Spaces deploy is containerized
+- a frontend Docker image or Vercel deployment, and further hosted-backend alternatives — both redundant with the already-live GitHub Pages/HF Spaces deployment, so skipped rather than built as unused placeholders (see Phase 6)
 
 AWS is optional and not required for the first strong demo.
 
@@ -445,15 +445,14 @@ Implemented:
 
 ## Current Completion Estimate
 
-Approximate status: 80-85%.
+Approximate status: 85-90%.
 
-The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline with a relative-score fallback so a strict all-must-haves gate doesn't dead-end real batches), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, background-threaded resume parsing with live progress tracking, persistence now on TiDB Cloud (production-stable, no more Aiven auto-sleep risk), a synthetic benchmark suite backing the ranking-quality claims, and the recruiter dashboard (including candidate comparison and CSV export), job seeker qualification-gap dashboard, and job seeker "search real jobs" feature all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product — remaining gaps are UI polish and LLM-judgment-quality evaluation, not core functionality.
+The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline with a relative-score fallback so a strict all-must-haves gate doesn't dead-end real batches), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, background-threaded resume parsing with live progress tracking, persistence now on TiDB Cloud (production-stable, no more Aiven auto-sleep risk), a synthetic benchmark suite backing the ranking-quality claims plus a labeled LLM judgment-quality benchmark (education-match/experience-relevance scored against the live model, 8/8 agreement with human labels), local reproducibility via `docker-compose.yml`, and the recruiter dashboard (including candidate comparison and CSV export), job seeker qualification-gap dashboard, and job seeker "search real jobs" feature all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product — remaining gaps are UI polish and demo assets, not core functionality.
 
 Major missing pieces:
 
 - further UI/UX polish
 - documentation and demo assets
-- a labeled quality check on the LLM-scored stages themselves (education-against-a-real-requirement matching, experience-relevance judgment quality) — see `benchmarks/README.md`'s "what's not covered" section; the deterministic pipeline has benchmark coverage, the LLM judgment quality doesn't yet
 
 ## Known Issues
 
@@ -529,7 +528,8 @@ Done:
 
 - synthetic benchmark scenarios (`benchmarks/scenarios.py`) covering eligibility gating, job-hopper detection, the "no education requirement" edge case, and the relative-score fallback pool — run via `python -m benchmarks.run_evaluation` (also wired into the normal `pytest` suite via `tests/test_benchmarks.py`)
 - first-pass vs. reranked comparison scenario, demonstrating why the LLM reranking stage changes candidate order
-- `benchmarks/README.md` documents what's covered and, importantly, what isn't yet (LLM judgment *quality* on education/experience-relevance scoring — see Major missing pieces above)
+- LLM judgment-quality benchmark (`benchmarks/llm_quality_scenarios.py` + `run_llm_quality_eval.py`): 8 hand-labeled cases run against the *live* Gemini API to check `education_match` and `rerank_experience_relevance`'s actual judgment quality, not just the parsing/blending code around them — makes real API calls, so it's opt-in (`python -m benchmarks.run_llm_quality_eval`, or `RUN_LLM_QUALITY_BENCHMARK=1 pytest tests/test_llm_quality_eval.py`) rather than part of the default pytest run. Current result: 8/8 agreement with the human-labeled expectations.
+- `benchmarks/README.md` documents both benchmark suites and what each does and doesn't cover
 
 Not done (deliberately out of scope for now):
 
@@ -548,22 +548,29 @@ Potential useful RAG features:
 
 Avoid adding RAG only for buzzwords.
 
-### Phase 6 - Docker and deployment
+### Phase 6 - Docker and local reproducibility (done)
 
-Goal: make the project reproducible and demo-friendly.
+Goal: let someone clone the repo and run the full stack locally without manually
+installing Docling's heavy dependency chain (torch/transformers/docling-ibm-models)
+or standing up a local MySQL — production deployment itself was already solved
+(HF Spaces + GitHub Pages + TiDB Cloud), so this phase was scoped down to just
+that gap.
 
-Tasks:
+Done:
 
-- Dockerfile for backend
-- Docker Compose for backend + MySQL
-- frontend Docker or Vercel deployment
-- optional hosted backend if free/affordable
+- `Dockerfile` for the backend (already existed for the HF Spaces deploy, reused as-is)
+- `docker-compose.yml`: backend + a local MySQL 8 service auto-initialized from `backend/schema.sql`, `docker compose up --build` — see README's "Local development with Docker" section
+
+Deliberately not done (would be redundant, not deferred-for-later):
+
+- frontend Docker or Vercel deployment — the frontend already auto-deploys to GitHub Pages on every push to `main`
+- an additional/alternative hosted backend — already live on Hugging Face Spaces; `render.yaml` is kept in the repo from an earlier attempt in case a paid tier is worth revisiting, but nothing further is planned here
 
 ## Near-Term Priority
 
-Phases 1-4 are done, plus the production DB migration to TiDB. What's left is lower-stakes polish rather than core product gaps:
+Phases 1-6 are done, plus the production DB migration to TiDB. What's left is lower-stakes polish rather than core product gaps:
 
-> UI/UX polish and demo assets, plus (optionally) a labeled quality check on the LLM-scored stages themselves — see "Major missing pieces" above. Phase 5 (RAG/embeddings) remains explicitly deferred with no concrete need identified yet; Phase 6 (Docker/local reproducibility) hasn't been started.
+> UI/UX polish and demo assets. Phase 5 (RAG/embeddings) remains explicitly deferred with no concrete need identified yet.
 
 ## Notes for Recruiter/LinkedIn Positioning
 
