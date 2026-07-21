@@ -158,6 +158,9 @@ def build_summary(final_results):
             "final_score": item["final_score"],
             "first_pass_rank": item["rank"],
             "first_pass_overall_score": item["overall_score"],
+            "job_stability_flag": item.get("job_stability", {}).get("flag"),
+            "average_tenure_years": item.get("job_stability", {}).get("average_tenure_years"),
+            "short_stints_count": item.get("job_stability", {}).get("short_stints_count"),
             "experience_relevance_score": (
                 item["experience_relevance"]["experience_relevance_score"]
                 if item["experience_relevance"]

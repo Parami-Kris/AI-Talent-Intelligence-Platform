@@ -18,6 +18,64 @@ with open("parsed_jd.json", "r") as f:
 with open("candidate_profiles.json", "r") as f:
     candidate_data = json.load(f)
 
+NO_REQUIREMENT_PHRASES = {
+    "not specified",
+    "n/a",
+    "na",
+    "none",
+    "not mentioned",
+    "not applicable",
+    "not required",
+    "no requirement",
+    "not stated",
+    "unspecified",
+    "none specified",
+    "none mentioned",
+}
+
+
+def has_real_requirement(text):
+    """True if `text` is an actual requirement rather than a JD-parser placeholder
+    like "Not specified" - the LLM's extraction schema always has a value in the
+    example, so it sometimes fills this in instead of returning "" when the JD
+    genuinely says nothing about education. A bare truthiness check on the raw
+    string doesn't catch that, so the "no requirement" short-circuit downstream
+    would otherwise incorrectly send every candidate through real LLM scoring
+    against a requirement that doesn't actually exist.
+    """
+    normalized = (text or "").strip()
+    if not normalized:
+        return False
+    return normalized.lower() not in NO_REQUIREMENT_PHRASES
+
+
+def summarize_education(education):
+    """Deterministic "<degree> from <institution> (<year>)" summary built directly
+    from the candidate's structured education field - shown regardless of whether
+    the JD has an education requirement to score against, and independent of
+    whatever an LLM's evidence text chooses to include (which can drop the
+    institution/year even when the resume clearly states them).
+    """
+    summaries = []
+    for entry in education or []:
+        degree = (entry.get("degree") or "").strip()
+        institution = (entry.get("institution") or "").strip()
+        year = str(entry.get("year") or "").strip()
+
+        if degree and institution:
+            label = f"{degree} from {institution}"
+        elif degree:
+            label = degree
+        elif institution:
+            label = institution
+        else:
+            continue
+
+        summaries.append(f"{label} ({year})" if year else label)
+
+    return summaries
+
+
 def normalize_skill(skill):
     return re.sub(r"[^a-z0-9]+", "", skill.lower())
 
@@ -114,8 +172,8 @@ def skill_match(resume,jd):
 
 def education_match(resume,jd):
     jd_edu = (jd.get("education_required") or "").strip()
-    
-    if not jd_edu:
+
+    if not has_real_requirement(jd_edu):
         return {
             "score": None,
             "status": "not_specified",

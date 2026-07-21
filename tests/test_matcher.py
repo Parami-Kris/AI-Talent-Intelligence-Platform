@@ -5,9 +5,11 @@ from pipeline.matcher import (
     education_match,
     eligibility_match,
     experience_match,
+    has_real_requirement,
     normalize_skill,
     overall_match,
     skill_match,
+    summarize_education,
 )
 from tests._fakes import FakeGenAIClient
 
@@ -128,6 +130,50 @@ def test_education_match_short_circuits_when_education_required_is_none():
 
     assert result["score"] is None
     assert result["status"] == "not_specified"
+
+
+def test_education_match_short_circuits_on_placeholder_text_from_jd_parser():
+    # Regression: the JD parser's extraction schema shows a non-empty example value
+    # for education_required, so it sometimes fills in "Not specified" instead of ""
+    # when the JD genuinely says nothing about education - a bare truthiness check
+    # doesn't catch that and used to send every candidate through real LLM scoring
+    # against a requirement that doesn't actually exist.
+    result = education_match({"education": []}, {"education_required": "Not specified"})
+
+    assert result["score"] is None
+    assert result["status"] == "not_specified"
+
+
+def test_has_real_requirement_rejects_placeholder_phrases():
+    assert has_real_requirement("Bachelor's degree") is True
+    assert has_real_requirement("  Bachelor's degree  ") is True
+    assert has_real_requirement("Not specified") is False
+    assert has_real_requirement("not specified") is False
+    assert has_real_requirement("N/A") is False
+    assert has_real_requirement("") is False
+    assert has_real_requirement(None) is False
+
+
+def test_summarize_education_formats_degree_institution_and_year():
+    education = [
+        {"degree": "B.Tech", "institution": "IIT Kharagpur", "year": "2020"},
+        {"degree": "B.E/B.Tech", "institution": "A.C.Patil College of Engineering"},
+        {"institution": "Some University"},
+        {},
+    ]
+
+    summary = summarize_education(education)
+
+    assert summary == [
+        "B.Tech from IIT Kharagpur (2020)",
+        "B.E/B.Tech from A.C.Patil College of Engineering",
+        "Some University",
+    ]
+
+
+def test_summarize_education_handles_empty_input():
+    assert summarize_education([]) == []
+    assert summarize_education(None) == []
 
 
 def test_experience_match_success_parses_response(monkeypatch):

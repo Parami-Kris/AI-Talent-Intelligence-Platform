@@ -8,14 +8,21 @@ from pipeline.matcher import (
     MODEL_ID,
     client,
     eligibility_match,
+    has_real_requirement,
     jd_data,
     overall_match,
     skill_match,
+    summarize_education,
 )
 
 from backend.app.utils.llm_json import parse_llm_json
 
 logger = logging.getLogger(__name__)
+
+JOB_HOPPER_SHORT_STINT_YEARS = 1.0
+JOB_HOPPER_MIN_SHORT_STINTS = 2
+JOB_HOPPER_MIN_JOB_COUNT = 3
+JOB_HOPPER_AVG_TENURE_YEARS = 1.2
 
 
 MONTHS = {
@@ -80,6 +87,42 @@ def duration_years(duration):
     return max(months / 12, 0)
 
 
+def job_stability_signal(candidate):
+    """Surface job-hopping as a visible signal for human review, not a hard filter
+    (per the project's eligibility-vs-similarity / human-review-first design principles).
+    Ongoing free-text "duration" strings mean this is necessarily an estimate.
+    """
+    tenures = [
+        duration_years(item.get("duration", ""))
+        for item in candidate.get("experience", [])
+        if item.get("duration")
+    ]
+    tenures = [years for years in tenures if years > 0]
+    job_count = len(tenures)
+
+    if job_count == 0:
+        return {
+            "job_count": 0,
+            "average_tenure_years": None,
+            "short_stints_count": 0,
+            "flag": "insufficient_data",
+        }
+
+    short_stints_count = sum(1 for years in tenures if years < JOB_HOPPER_SHORT_STINT_YEARS)
+    average_tenure_years = sum(tenures) / job_count
+
+    is_frequent_job_changes = job_count >= JOB_HOPPER_MIN_JOB_COUNT and (
+        short_stints_count >= JOB_HOPPER_MIN_SHORT_STINTS or average_tenure_years < JOB_HOPPER_AVG_TENURE_YEARS
+    )
+
+    return {
+        "job_count": job_count,
+        "average_tenure_years": round(average_tenure_years, 2),
+        "short_stints_count": short_stints_count,
+        "flag": "frequent_job_changes" if is_frequent_job_changes else "stable",
+    }
+
+
 def minimum_required_years(experience_required):
     match = re.search(r"(\d+(?:\.\d+)?)", experience_required or "")
     return float(match.group(1)) if match else 0
@@ -125,7 +168,7 @@ def default_education_result(reason):
 
 def batch_education_match(candidates, jd):
     jd_edu = (jd.get("education_required") or "").strip()
-    if not jd_edu:
+    if not has_real_requirement(jd_edu):
         return [
             default_education_result("The job description does not specify an education requirement.")
             for _ in candidates
@@ -222,6 +265,9 @@ def rank_candidate(candidate, jd, edu_result):
             "experience": exp_result,
             "education": edu_result,
         },
+        "job_stability": job_stability_signal(candidate),
+        "education_summary": summarize_education(candidate.get("education", [])),
+        "raw_text": candidate.get("raw_text"),
     }
 
 
@@ -259,6 +305,9 @@ def build_summary(ranked):
             "meets_experience": result["eligibility"]["meets_experience"],
             "missing_must_haves_count": len(result["eligibility"]["missing_must_haves"]),
             "top_missing_must_haves": result["eligibility"]["missing_must_haves"][:5],
+            "job_stability_flag": result["job_stability"]["flag"],
+            "average_tenure_years": result["job_stability"]["average_tenure_years"],
+            "short_stints_count": result["job_stability"]["short_stints_count"],
         }
         for result in ranked
     ]

@@ -1,6 +1,7 @@
 from pipeline import shortlist_reranker
 from pipeline.shortlist_reranker import (
     build_shortlist_payload,
+    build_summary,
     candidate_lookup,
     merge_rerank_results,
     rerank_experience_relevance,
@@ -58,6 +59,32 @@ def test_merge_rerank_results_blends_scores_and_ranks():
     # Alice's blended score (88) beats Bob's (54) despite lower first-pass rank.
     assert merged[0]["candidate_name"] == "Alice"
     assert merged[0]["final_rank"] == 1
+
+
+def test_merge_rerank_results_carries_job_stability_into_summary():
+    first_pass = [
+        {
+            "candidate_name": "Alice",
+            "overall_score": 80,
+            "is_eligible": True,
+            "rank": 1,
+            "job_stability": {"flag": "frequent_job_changes", "average_tenure_years": 0.8, "short_stints_count": 3},
+        },
+    ]
+    rerank_results = [
+        {
+            "candidate_name": "Alice",
+            "experience_relevance_score": 100,
+            "seniority_fit": "strong",
+            "domain_fit": "strong",
+        }
+    ]
+
+    merged = merge_rerank_results(first_pass, rerank_results)
+    summary = build_summary(merged)
+
+    assert summary[0]["job_stability_flag"] == "frequent_job_changes"
+    assert summary[0]["short_stints_count"] == 3
 
 
 def test_rerank_experience_relevance_success_parses_response(monkeypatch):

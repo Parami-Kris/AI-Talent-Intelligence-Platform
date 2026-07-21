@@ -41,6 +41,13 @@ def extract_structured_jd(text):
     - Expand abbreviations and use official names consistently.
     - Do not include both an abbreviation and its expanded form.
 
+    education_required:
+    - Only fill this in if the job description actually states a degree,
+      certification, or education requirement.
+    - If the job description does not mention education at all, set
+      education_required to an empty string "" - do not write placeholder
+      text like "Not specified" or "N/A".
+
     Job Description:
     {text}
     """
