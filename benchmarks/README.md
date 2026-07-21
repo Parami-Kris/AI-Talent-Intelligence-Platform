@@ -33,17 +33,37 @@ up in ordinary test runs too, not only when this script is run explicitly.
 - `relative_score_floor_selects_expected_pool` - when nobody is hard-eligible, the relative-score fallback pool (>=50/100) contains exactly the candidates who clear that floor.
 - `first_pass_vs_reranked_comparison` - demonstrates why the LLM reranking stage exists: a candidate can win on first-pass deterministic score alone but rank lower once LLM-judged experience relevance is blended in, and vice versa.
 
-## What's not covered (yet)
+## LLM judgment-quality benchmark
 
-LLM-scored stages that require a real requirement to evaluate against - education
-matching against an actual degree requirement, and the LLM experience-relevance
-prompt's own judgment quality - aren't exercised here, since that would require
-either live Gemini calls (costs quota, non-deterministic) or mocking the LLM
-response (which only tests the parsing/blending code, not the prompt's actual
-judgment). `tests/test_matcher.py` and `tests/test_shortlist_reranker.py` cover
-the parsing/fallback behavior of those LLM calls with mocked responses; there's
-no automated check yet on whether the LLM's actual judgments are *good*. Adding
-that would mean a small set of real resume/JD pairs with a human-labeled "correct"
-relevance judgment to compare the live LLM output against - worth doing before
-leaning on this project's LLM-scoring quality as a portfolio claim, not required
-for the deterministic-pipeline coverage this currently provides.
+`benchmarks/llm_quality_scenarios.py` + `run_llm_quality_eval.py` check whether
+the *actual judgment* of the LLM-scored stages is good, not just whether the
+surrounding parsing/blending code is correct. Unlike the scenarios above, this
+makes real Gemini calls, so it's kept separate and opt-in rather than part of
+the default pytest run:
+
+```bash
+python -m benchmarks.run_llm_quality_eval
+python -m benchmarks.run_llm_quality_eval --report benchmarks/llm_quality_report.md
+```
+
+Requires `GOOGLE_API_KEY`. Also runnable via `pytest` if you explicitly opt in
+(`RUN_LLM_QUALITY_BENCHMARK=1 pytest tests/test_llm_quality_eval.py`) - skipped
+by default so ordinary test runs stay free, fast, and deterministic.
+
+Covers:
+
+- `education_match` against 5 hand-labeled cases: exact degree match, a
+  higher-than-required degree, a missing degree, a clearly unrelated field, and
+  an adjacent-but-not-exact field (expects `partially_matched`)
+- `rerank_experience_relevance` against 3 hand-labeled cases: highly relevant
+  senior experience (expects a high score), years present but an unrelated
+  domain like retail management (expects a low score despite meeting the years
+  threshold), and an adjacent domain like data analytics for an ML role
+  (expects a middle-band score)
+
+Each case asserts a coarse expected bucket (status enum or score range) rather
+than an exact score, since the point is checking the model lands in the right
+neighborhood, not reproducing one "correct" number. `tests/test_matcher.py` and
+`tests/test_shortlist_reranker.py` still separately cover the parsing/fallback
+behavior of these same LLM calls with mocked responses - this benchmark is the
+complement that checks judgment quality with the real model.
