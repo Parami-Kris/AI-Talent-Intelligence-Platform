@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, detailMessage } from '../../api/client'
-import { searchJobs } from '../../api/endpoints'
-import type { JobSearchResult } from '../../api/types'
+import { logJobEvent, searchJobs } from '../../api/endpoints'
+import type { JobEventType, JobSearchResult } from '../../api/types'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
 import { ADZUNA_COUNTRIES } from '../../lib/adzunaCountries'
+import { getCandidateId } from '../../lib/candidateId'
 import { JobFitCheck } from './JobFitCheck'
+
+function jobKey(job: JobSearchResult): string {
+  return `${job.source}-${job.id}`
+}
 
 export function JobSearchResultsPage() {
   const [searchParams] = useSearchParams()
@@ -15,7 +20,9 @@ export function JobSearchResultsPage() {
   const [country, setCountry] = useState(() => searchParams.get('country') ?? 'in')
   const [results, setResults] = useState<JobSearchResult[] | null>(null)
   const [expandedTitles, setExpandedTitles] = useState<string[]>([])
+  const [recommended, setRecommended] = useState(false)
   const [selected, setSelected] = useState<JobSearchResult | null>(null)
+  const [likedKeys, setLikedKeys] = useState<Set<string>>(new Set())
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Cancels a still-in-flight search (rather than just ignoring its result) when a
@@ -24,11 +31,32 @@ export function JobSearchResultsPage() {
   // ignoring) avoids doubling up real outbound API load against rate-limited keys.
   const activeSearchController = useRef<AbortController | null>(null)
 
+  const logEvent = (eventType: JobEventType, job: JobSearchResult) => {
+    // Fire-and-forget - history logging must never block or interrupt the actual
+    // job-search flow.
+    logJobEvent({
+      candidate_id: getCandidateId(),
+      event_type: eventType,
+      job_source: job.source,
+      job_external_id: job.id,
+      job_title: job.title,
+      company: job.company,
+      location: job.location,
+    }).catch(() => {})
+  }
+
+  const selectJob = (job: JobSearchResult) => {
+    setSelected(job)
+    logEvent('viewed', job)
+  }
+
+  const handleLike = (job: JobSearchResult) => {
+    if (likedKeys.has(jobKey(job))) return
+    setLikedKeys((prev) => new Set(prev).add(jobKey(job)))
+    logEvent('liked', job)
+  }
+
   const handleSearch = async () => {
-    if (!query.trim()) {
-      setError('Enter a keyword to search, e.g. "machine learning engineer".')
-      return
-    }
     activeSearchController.current?.abort()
     const controller = new AbortController()
     activeSearchController.current = controller
@@ -36,10 +64,20 @@ export function JobSearchResultsPage() {
     setError(null)
     setIsSearching(true)
     try {
-      const response = await searchJobs(query.trim(), location.trim() || undefined, country, controller.signal)
+      const response = await searchJobs(
+        query.trim(),
+        location.trim() || undefined,
+        country,
+        controller.signal,
+        getCandidateId(),
+      )
       setResults(response.results)
       setExpandedTitles(response.expanded_titles)
-      setSelected(response.results[0] ?? null)
+      setRecommended(response.recommended)
+      if (response.recommended) setQuery(response.used_query)
+      const first = response.results[0] ?? null
+      setSelected(first)
+      if (first) logEvent('viewed', first)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return // superseded by a newer search
       setError(err instanceof ApiError ? detailMessage(err.detail) : 'Failed to search jobs.')
@@ -48,12 +86,15 @@ export function JobSearchResultsPage() {
     }
   }
 
-  // Auto-run the search once if we arrived here with a query already picked
-  // (from the inline search bar on the main job-seeker page). Aborts on cleanup so
-  // StrictMode's synthetic dev-mode remount cancels the first invocation's request
-  // instead of leaving it to run to completion in the background.
+  // Auto-run the search once if we arrived here via the inline search bar on the
+  // main job-seeker page - either with a query, or deliberately blank to trigger
+  // the recommended-from-history search (searchParams still carries `country` in
+  // that case, which is how we tell "navigated here" apart from a cold direct
+  // visit to this URL with nothing to search). Aborts on cleanup so StrictMode's
+  // synthetic dev-mode remount cancels the first invocation's request instead of
+  // leaving it to run to completion in the background.
   useEffect(() => {
-    if (query.trim()) {
+    if (query.trim() || searchParams.toString()) {
       void handleSearch()
     }
     return () => activeSearchController.current?.abort()
@@ -80,7 +121,7 @@ export function JobSearchResultsPage() {
           disabled={isSearching}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Job title or keywords"
+          placeholder="Job title or keywords (leave blank once you've liked a few jobs)"
           className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
         />
         <input
@@ -117,6 +158,13 @@ export function JobSearchResultsPage() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {isSearching && <LoadingSpinner label="Searching job boards…" />}
 
+      {!isSearching && recommended && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          No keyword entered — showing results for <span className="font-medium">{query}</span>, based on jobs
+          you've liked, applied to, or viewed.
+        </p>
+      )}
+
       {!isSearching && expandedTitles.length > 0 && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Also searching related titles: <span className="font-medium">{expandedTitles.join(', ')}</span>
@@ -134,8 +182,8 @@ export function JobSearchResultsPage() {
               return (
                 <button
                   type="button"
-                  key={`${job.source}-${job.id}`}
-                  onClick={() => setSelected(job)}
+                  key={jobKey(job)}
+                  onClick={() => selectJob(job)}
                   className={`block w-full rounded-md border p-3 text-left text-sm ${
                     isSelected
                       ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/30'
@@ -155,7 +203,21 @@ export function JobSearchResultsPage() {
             {selected ? (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-lg font-semibold">{selected.title ?? 'Untitled role'}</h2>
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="text-lg font-semibold">{selected.title ?? 'Untitled role'}</h2>
+                    <button
+                      type="button"
+                      onClick={() => handleLike(selected)}
+                      title="Like this job — helps us recommend similar roles"
+                      className={`shrink-0 rounded-md border px-2 py-1 text-xs font-medium ${
+                        likedKeys.has(jobKey(selected))
+                          ? 'border-pink-300 bg-pink-100 text-pink-700 dark:border-pink-800 dark:bg-pink-950/40 dark:text-pink-300'
+                          : 'border-gray-300 text-gray-500 hover:border-pink-300 hover:text-pink-600 dark:border-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {likedKeys.has(jobKey(selected)) ? '♥ Liked' : '♡ Like'}
+                    </button>
+                  </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {[selected.company, selected.location].filter(Boolean).join(' · ')}
                   </p>
@@ -164,6 +226,7 @@ export function JobSearchResultsPage() {
                       href={selected.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => logEvent('applied', selected)}
                       className="mt-2 inline-block text-sm text-indigo-600 hover:underline dark:text-indigo-400"
                     >
                       View original posting ↗

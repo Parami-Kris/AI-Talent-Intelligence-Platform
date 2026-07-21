@@ -41,7 +41,6 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
   const isBusy = phase !== 'idle'
 
   const goToSearchResults = () => {
-    if (!searchQuery.trim()) return
     const params = new URLSearchParams({ query: searchQuery.trim(), country: searchCountry })
     if (searchLocation.trim()) params.set('location', searchLocation.trim())
     navigate(`/job-seeker/search?${params.toString()}`)
@@ -113,7 +112,7 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Job title or keywords"
+              placeholder="Job title or keywords (leave blank once you've liked a few jobs)"
               className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
             />
             <input
