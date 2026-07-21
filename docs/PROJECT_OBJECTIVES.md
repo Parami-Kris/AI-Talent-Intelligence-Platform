@@ -445,24 +445,22 @@ Implemented:
 
 ## Current Completion Estimate
 
-Approximate status: 60-70%.
+Approximate status: 80-85%.
 
-The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, initial persistence, a test suite that now covers the Gemini-calling code paths, and the recruiter dashboard, job seeker qualification-gap dashboard, and job seeker "search real jobs" feature all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product.
+The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline with a relative-score fallback so a strict all-must-haves gate doesn't dead-end real batches), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, background-threaded resume parsing with live progress tracking, persistence now on TiDB Cloud (production-stable, no more Aiven auto-sleep risk), a synthetic benchmark suite backing the ranking-quality claims, and the recruiter dashboard (including candidate comparison and CSV export), job seeker qualification-gap dashboard, and job seeker "search real jobs" feature all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product — remaining gaps are UI polish and LLM-judgment-quality evaluation, not core functionality.
 
 Major missing pieces:
 
-- candidate comparison view and result export (recruiter dashboard)
 - further UI/UX polish
-- evaluation/benchmarking against a labeled dataset
 - documentation and demo assets
-- MySQL production hosting migration from Aiven to TiDB Cloud (schema ready, HF secrets not yet switched)
+- a labeled quality check on the LLM-scored stages themselves (education-against-a-real-requirement matching, experience-relevance judgment quality) — see `benchmarks/README.md`'s "what's not covered" section; the deterministic pipeline has benchmark coverage, the LLM judgment quality doesn't yet
 
 ## Known Issues
 
 - (Resolved) The repo previously had no commits. It now has an initial commit and is pushed to `https://github.com/Parami-Kris/AI-Talent-Intelligence-Platform`.
 - (Resolved) The LangGraph pipeline's resume step used to depend on an in-memory checkpointer that wouldn't survive a process restart. Fixed via a durable `pipeline_reviews` MySQL table — see the LangGraph section above.
 - (Resolved) Render's free tier couldn't run the backend — Docling's dependency chain (`torch`/`transformers`/`docling-ibm-models`) is too heavy for its 512MB RAM / 0.1 CPU, causing either OOM kills or startup timeouts. Moved backend hosting to Hugging Face Spaces (Docker SDK), which has much more headroom on its free CPU tier.
-- (In progress) Aiven's free-tier MySQL auto-powers-off after inactivity, which would hard-fail the app's core persistence (not just the job-search cache, which degrades gracefully) if hit while asleep. Migrating to TiDB Cloud Starter — schema verified working there, production secrets not yet switched.
+- (Resolved 2026-07-15) Aiven's free-tier MySQL auto-powered-off after inactivity, which would hard-fail the app's core persistence if hit while asleep. Migrated production to TiDB Cloud Serverless (verified via a direct connection: schema present, all 6 tables match `backend/schema.sql`; HF Space secrets `MYSQL_HOST`/`PORT`/`USER`/`PASSWORD`/`DATABASE` all updated to point at it, `MYSQL_DATABASE=ai_resume_screening`).
 
 ## Next Engineering Tasks
 
@@ -510,19 +508,34 @@ Job seeker mode (done):
 - upload own resume, with a paste-text-or-upload-file toggle for the JD
 - qualification gaps, missing must-haves, suggested projects, resume improvement recommendations, role-readiness score
 - route at `/job-seeker`, reachable from the main nav
+- job search recommendation memory (added 2026-07-15): an anonymous, localStorage-generated `candidate_id` (upgradeable to an email-based identity later with no schema change) is attached to search/view/apply/like activity, logged to a new `candidate_job_events` table. Signals are weighted `liked` (3) > `applied`, inferred from clicking the external posting link (2) > `viewed`, from opening a result's detail (1) — deliberately content-based/frequency-based rather than embeddings or collaborative filtering, since there's no real user base yet to make either of those worthwhile. When a candidate searches with an empty keyword, `GET /jobs/search` falls back to their highest-weighted past job title instead of erroring, with the UI showing "No keyword entered — showing results for X, based on jobs you've liked, applied to, or viewed." Falls back to a 422 ("enter a keyword") only when there's truly no history yet.
 
-### Phase 4 - Explainability and evaluation
+Recruiter dashboard additions since initial Phase 3 (done):
+
+- candidate detail moved from an overlay drawer to a persistent split view (compact list + docked profile panel), used consistently across the review, final-results, and no-eligible-candidates screens
+- job-hopper detection (`job_stability` signal on every ranked candidate — flags frequent short stints without auto-disqualifying, per the human-review design principle)
+- relative-score fallback shortlist: when zero candidates meet every hard must-have, the pipeline no longer dead-ends — it shortlists from whoever clears a 50/100 floor (anchored to the batch's top scorer, still capped by the requested shortlist size) instead
+- deterministic per-candidate education summary (`"<degree> from <institution> (<year>)"`), shown regardless of whether the JD has an education requirement, independent of LLM evidence-text quality
+- fixed a JD-parser bug where a placeholder value like `"Not specified"` for `education_required` was treated as a real requirement, sending every candidate through pointless (and uniformly low-scoring) LLM education evaluation
+- multi-select candidate comparison (side-by-side table: score, skills matched/missing, experience, education, job stability, LLM relevance)
+- CSV export of any candidate group/results table
+- resume-parsing progress tracking (`POST /upload/parse/start` + `GET /upload/parse/status/{job_id}`, polled by the frontend) — Docling/Gemini parsing now runs in a background thread instead of blocking the whole server, and the UI shows live "X of Y resumes parsed" + an ETA instead of a blind wait
+
+### Phase 4 - Explainability and evaluation (done)
 
 Goal: make it credible as an Advanced AI project.
 
-Tasks:
+Done:
 
-- create synthetic benchmark scenarios
-- compare first-pass ranking vs reranked output
-- document failure cases
-- add score contribution view
-- add fairness/human-review limitations
-- optionally add clustering visualization
+- synthetic benchmark scenarios (`benchmarks/scenarios.py`) covering eligibility gating, job-hopper detection, the "no education requirement" edge case, and the relative-score fallback pool — run via `python -m benchmarks.run_evaluation` (also wired into the normal `pytest` suite via `tests/test_benchmarks.py`)
+- first-pass vs. reranked comparison scenario, demonstrating why the LLM reranking stage changes candidate order
+- `benchmarks/README.md` documents what's covered and, importantly, what isn't yet (LLM judgment *quality* on education/experience-relevance scoring — see Major missing pieces above)
+
+Not done (deliberately out of scope for now):
+
+- score contribution view (a per-candidate breakdown UI of how much each factor contributed to the final score — the raw numbers are already visible in the candidate detail panel, but not a dedicated visualization)
+- fairness/human-review limitations write-up
+- clustering visualization (optional even in the original plan)
 
 ### Phase 5 - RAG and embeddings, only if useful
 
@@ -548,9 +561,9 @@ Tasks:
 
 ## Near-Term Priority
 
-Phases 1-3 are done: the FastAPI backend foundation, file-upload ingestion, and the web app (recruiter dashboard plus job seeker qualification-gap dashboard, both deployed live). The immediate next best step is:
+Phases 1-4 are done, plus the production DB migration to TiDB. What's left is lower-stakes polish rather than core product gaps:
 
-> Phase 4 - explainability and evaluation: build a small labeled benchmark set and compare first-pass vs. reranked output, to make the ranking quality claims credible rather than anecdotal.
+> UI/UX polish and demo assets, plus (optionally) a labeled quality check on the LLM-scored stages themselves — see "Major missing pieces" above. Phase 5 (RAG/embeddings) remains explicitly deferred with no concrete need identified yet; Phase 6 (Docker/local reproducibility) hasn't been started.
 
 ## Notes for Recruiter/LinkedIn Positioning
 
@@ -560,8 +573,8 @@ Avoid presenting the project as:
 
 Present it as:
 
-> I built an end-to-end AI Talent Intelligence Platform with document parsing, structured resume/JD extraction, deterministic eligibility checks, evidence-backed ranking, a LangGraph-orchestrated ranking pipeline with a human-in-the-loop review checkpoint, job seeker qualification-gap analysis, LLM-based shortlist reranking, MySQL persistence, and planned recruiter/job-seeker dashboards.
+> I built an end-to-end AI Talent Intelligence Platform with document parsing, structured resume/JD extraction, deterministic eligibility checks, evidence-backed ranking with a relative-scoring fallback for realistic (non-100%) candidate pools, job-hopping/tenure signals surfaced for human review rather than auto-rejection, a LangGraph-orchestrated ranking pipeline with a human-in-the-loop review checkpoint (including candidate comparison and CSV export), job seeker qualification-gap analysis, LLM-based shortlist reranking, a synthetic benchmark suite backing the ranking-quality claims, MySQL persistence, and recruiter/job-seeker dashboards.
 
 Possible resume bullet:
 
-> Built an AI-assisted talent intelligence platform using Python, Gemini, LangGraph, Docling, and MySQL, combining structured resume/JD parsing, deterministic eligibility checks, evidence-backed scoring, batch ranking, LLM-based shortlist reranking, a stateful human-in-the-loop review pipeline, and job seeker qualification-gap analysis.
+> Built an AI-assisted talent intelligence platform using Python, Gemini, LangGraph, Docling, and MySQL, combining structured resume/JD parsing, deterministic eligibility checks with a relative-scoring fallback, evidence-backed scoring, batch ranking, LLM-based shortlist reranking, a stateful human-in-the-loop review pipeline with candidate comparison, a synthetic benchmark suite for ranking-quality evaluation, and job seeker qualification-gap analysis.
