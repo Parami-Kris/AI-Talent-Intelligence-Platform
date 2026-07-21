@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { CandidateResult, CandidateSummary } from '../../../api/types'
 import { ScoreRing } from '../../../components/ScoreRing'
+import { useEscapeKey } from '../../../lib/useEscapeKey'
 import { joinCandidateDetail } from '../lib/joinCandidateDetail'
 import { EligibilityBadge, JobStabilityBadge } from './EligibilityBadge'
 
@@ -24,17 +25,25 @@ function Cell({ children }: { children: ReactNode }) {
 }
 
 export function CandidateComparisonPanel({ rows, fullResults, onClose, onRemove }: CandidateComparisonPanelProps) {
+  useEscapeKey(onClose)
+
   return (
     <div
       className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
       onClick={onClose}
+      role="presentation"
     >
       <div
         className="mt-8 mb-8 w-full max-w-6xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="compare-modal-title"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Compare candidates ({rows.length})</h3>
+          <h3 id="compare-modal-title" className="text-lg font-semibold">
+            Compare candidates ({rows.length})
+          </h3>
           <button
             type="button"
             onClick={onClose}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CandidateSummary, ManualAddition } from '../../../api/types'
+import { useEscapeKey } from '../../../lib/useEscapeKey'
 import { validateManualAddition } from '../lib/manualAdditionValidation'
 
 interface ManualAddModalProps {
@@ -13,6 +14,8 @@ export function ManualAddModal({ candidate, pending, onConfirm, onCancel }: Manu
   const [overrideReason, setOverrideReason] = useState('')
   const [addedBy, setAddedBy] = useState('')
   const [error, setError] = useState<string | undefined>()
+
+  useEscapeKey(onCancel)
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -29,13 +32,22 @@ export function ManualAddModal({ candidate, pending, onConfirm, onCancel }: Manu
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/30" onClick={onCancel}>
+    <div
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/30"
+      onClick={onCancel}
+      role="presentation"
+    >
       <form
         onSubmit={handleSubmit}
         onClick={(event) => event.stopPropagation()}
         className="w-full max-w-md space-y-4 rounded-md bg-white p-6 shadow-xl dark:bg-gray-900"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manual-add-modal-title"
       >
-        <h3 className="text-lg font-semibold">Add {candidate.candidate_name} to shortlist</h3>
+        <h3 id="manual-add-modal-title" className="text-lg font-semibold">
+          Add {candidate.candidate_name} to shortlist
+        </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           This candidate wasn't LLM-shortlisted. Provide a reason (e.g. strong interview performance) so
           the override is evidence-backed.
