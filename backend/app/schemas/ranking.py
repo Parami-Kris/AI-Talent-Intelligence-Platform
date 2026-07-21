@@ -71,3 +71,19 @@ class ParseUploadResponse(BaseModel):
     jd: dict[str, Any]
     candidates: list[dict[str, Any]]
     failures: list[dict[str, Any]] = []
+
+
+class ParseUploadJobResponse(BaseModel):
+    job_id: str
+    total: int
+
+
+class ParseUploadStatusResponse(BaseModel):
+    status: str
+    total: int
+    processed: int
+    current_filename: str | None = None
+    failures: list[dict[str, Any]] = []
+    error: str | None = None
+    jd: dict[str, Any] | None = None
+    candidates: list[dict[str, Any]] | None = None

@@ -4,6 +4,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from pipeline.scoring_utils import candidates_within_relative_floor
+
 
 class PipelineState(TypedDict, total=False):
     jd: dict[str, Any]
@@ -13,6 +15,8 @@ class PipelineState(TypedDict, total=False):
     top_n: int
     batch_ranking: dict[str, Any]
     eligible_count: int
+    relative_shortlist_count: int
+    used_relative_fallback: bool
     reranked: dict[str, Any]
     review_decision: dict[str, Any]
     persistence_result: dict[str, Any]
@@ -24,7 +28,13 @@ def rank_node(state: PipelineState) -> dict:
 
     batch_ranking = rank_candidates_for_jd(jd=state["jd"], candidates=state["candidates"])
     eligible_count = sum(1 for result in batch_ranking["results"] if result.get("is_eligible"))
-    return {"batch_ranking": batch_ranking, "eligible_count": eligible_count, "status": "ranked"}
+    relative_shortlist_count = len(candidates_within_relative_floor(batch_ranking["results"]))
+    return {
+        "batch_ranking": batch_ranking,
+        "eligible_count": eligible_count,
+        "relative_shortlist_count": relative_shortlist_count,
+        "status": "ranked",
+    }
 
 
 def no_eligible_node(state: PipelineState) -> dict:
@@ -34,16 +44,26 @@ def no_eligible_node(state: PipelineState) -> dict:
 def rerank_node(state: PipelineState) -> dict:
     from backend.app.services.reranking_service import rerank_shortlist_for_jd
 
+    # Fallback: nobody met every hard must-have, but some candidates still clear the
+    # relative-score floor (see pipeline/scoring_utils.py) - shortlist from that pool
+    # instead of dead-ending on "no eligible candidates". Still capped by the
+    # requested top_n, same as the normal path - just drawn from the floor-qualifying
+    # pool instead of the full batch. route_after_ranking only sends us here when
+    # relative_shortlist_count > 0.
+    used_relative_fallback = state.get("eligible_count", 0) == 0
+    requested_top_n = state.get("top_n", 10)
+    top_n = min(requested_top_n, state.get("relative_shortlist_count", 0)) if used_relative_fallback else requested_top_n
+
     reranked = rerank_shortlist_for_jd(
         jd=state["jd"],
         batch_rankings=state["batch_ranking"],
         candidates=state["candidates"],
-        top_n=state.get("top_n", 10),
+        top_n=top_n,
     )
-    return {"reranked": reranked, "status": "reranked"}
+    return {"reranked": reranked, "status": "reranked", "used_relative_fallback": used_relative_fallback}
 
 
-def build_review_payload(reranked: dict, batch_ranking: dict) -> dict:
+def build_review_payload(reranked: dict, batch_ranking: dict, used_relative_fallback: bool = False) -> dict:
     # rerank_shortlist_for_jd carries *every* first-pass candidate forward into
     # "results"/"summary" - top_n only controls who actually gets an LLM relevance
     # call, not who's present in the output. So "shortlisted" vs "everyone else" is
@@ -52,19 +72,29 @@ def build_review_payload(reranked: dict, batch_ranking: dict) -> dict:
     shortlisted = [item for item in summary if item.get("experience_relevance_score") is not None]
     other_candidates = [item for item in summary if item.get("experience_relevance_score") is None]
 
+    message = (
+        "Review the shortlist. Resume with action='approve' to persist as-is, "
+        "action='edit' (optionally with manual_additions and/or edited_results) "
+        "to persist a modified list, or action='reject' to discard this run. "
+        "manual_additions lets you flag a candidate from other_candidates "
+        "(e.g. one who interviewed well but wasn't LLM-shortlisted) with a reason."
+    )
+    if used_relative_fallback:
+        message = (
+            "No candidate met every hard must-have requirement, so this shortlist was built from relative "
+            "scoring instead: the strongest scorers of 50+ out of 100 in this batch, up to your requested "
+            "shortlist size. None of these candidates are hard-eligible - review the missing must-haves on "
+            "each one. "
+        ) + message
+
     return {
         "type": "shortlist_review",
         "job_title": reranked.get("job_title"),
         "shortlist_size": reranked.get("shortlist_size"),
         "shortlist": shortlisted,
         "other_candidates": other_candidates,
-        "message": (
-            "Review the shortlist. Resume with action='approve' to persist as-is, "
-            "action='edit' (optionally with manual_additions and/or edited_results) "
-            "to persist a modified list, or action='reject' to discard this run. "
-            "manual_additions lets you flag a candidate from other_candidates "
-            "(e.g. one who interviewed well but wasn't LLM-shortlisted) with a reason."
-        ),
+        "used_relative_fallback": used_relative_fallback,
+        "message": message,
     }
 
 
@@ -124,7 +154,9 @@ def human_review_node(state: PipelineState) -> dict:
     reranked = state["reranked"]
     batch_ranking = state["batch_ranking"]
 
-    decision = interrupt(build_review_payload(reranked, batch_ranking))
+    decision = interrupt(
+        build_review_payload(reranked, batch_ranking, state.get("used_relative_fallback", False))
+    )
 
     action = decision.get("action", "reject")
     updates: dict[str, Any] = {"review_decision": decision}
@@ -154,7 +186,11 @@ def reject_end_node(state: PipelineState) -> dict:
 
 
 def route_after_ranking(state: PipelineState) -> Literal["rerank", "no_eligible"]:
-    return "rerank" if state.get("eligible_count", 0) > 0 else "no_eligible"
+    if state.get("eligible_count", 0) > 0:
+        return "rerank"
+    if state.get("relative_shortlist_count", 0) > 0:
+        return "rerank"
+    return "no_eligible"
 
 
 def route_after_review(state: PipelineState) -> Literal["persist", "reject_end"]:

@@ -13,6 +13,7 @@ def test_parse_resume_upload_wires_extraction_together(monkeypatch):
 
     assert result["name"] == "Jane Doe"
     assert result["normalized_skills"] == ["Python"]
+    assert result["raw_text"] == "resume text"
     assert "error" not in result
 
 
@@ -64,3 +65,25 @@ def test_parse_resumes_batch_isolates_failures(monkeypatch):
     assert result["candidates"][0]["name"] == "good.pdf"
     assert len(result["failures"]) == 1
     assert result["failures"][0]["filename"] == "bad.pdf"
+
+
+def test_parse_resumes_batch_reports_progress_per_file(monkeypatch):
+    def fake_parse(content, filename):
+        if filename == "bad.pdf":
+            raise ValueError("boom")
+        return {"name": filename}
+
+    monkeypatch.setattr(intake, "parse_resume_upload", fake_parse)
+
+    events = []
+    intake.parse_resumes_batch(
+        [(b"1", "good.pdf"), (b"2", "bad.pdf")],
+        on_progress=lambda **kwargs: events.append(kwargs),
+    )
+
+    assert events == [
+        {"current_filename": "good.pdf"},
+        {"processed_increment": True},
+        {"current_filename": "bad.pdf"},
+        {"processed_increment": True},
+    ]

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 from pipeline.jd_parser import extract_structured_jd
 from pipeline.llm_parser import extract_structured_resume
@@ -29,6 +29,7 @@ def parse_resume_upload(content: bytes, filename: str) -> dict[str, Any]:
         "experience": llm_data.get("experience"),
         "projects": llm_data.get("projects"),
         "certifications": llm_data.get("certifications"),
+        "raw_text": text,
     }
 
 
@@ -42,14 +43,21 @@ def parse_jd_upload(content: bytes, filename: str) -> dict[str, Any]:
     return jd
 
 
-def parse_resumes_batch(files: list[tuple[bytes, str]]) -> dict[str, Any]:
+def parse_resumes_batch(
+    files: list[tuple[bytes, str]],
+    on_progress: Callable[..., None] | None = None,
+) -> dict[str, Any]:
     candidates = []
     failures = []
 
     for content, filename in files:
+        if on_progress:
+            on_progress(current_filename=filename)
         try:
             candidates.append(parse_resume_upload(content, filename))
         except Exception as exc:
             failures.append({"filename": filename, "reason": str(exc)})
+        if on_progress:
+            on_progress(processed_increment=True)
 
     return {"candidates": candidates, "failures": failures}

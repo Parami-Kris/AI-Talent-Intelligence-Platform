@@ -7,9 +7,9 @@ from tests.test_ranking_graph import _batch_ranking, _reranked
 client = TestClient(app)
 
 
-def _patch_pipeline_services(monkeypatch, *, eligible=True, persist_calls=None):
+def _patch_pipeline_services(monkeypatch, *, eligible=True, alice_score=90, bob_score=70, persist_calls=None):
     def fake_rank(jd, candidates):
-        return _batch_ranking(eligible=eligible)
+        return _batch_ranking(eligible=eligible, alice_score=alice_score, bob_score=bob_score)
 
     def fake_rerank(jd, batch_rankings, candidates, top_n=10):
         return _reranked(eligible=eligible)
@@ -77,7 +77,10 @@ def test_run_pipeline_returns_shortlist_and_other_candidates(monkeypatch):
 
 
 def test_run_pipeline_no_eligible_candidates(monkeypatch):
-    _patch_pipeline_services(monkeypatch, eligible=False)
+    # Below the relative-score floor (50) too, so this is a genuine dead end -
+    # see test_run_pipeline_falls_back_to_relative_scoring below for the case
+    # where nobody's hard-eligible but some candidates still clear that floor.
+    _patch_pipeline_services(monkeypatch, eligible=False, alice_score=40, bob_score=20)
 
     response = client.post("/pipeline/run", json=_run_payload())
 
@@ -85,6 +88,17 @@ def test_run_pipeline_no_eligible_candidates(monkeypatch):
     body = response.json()
     assert body["status"] == "no_eligible_candidates"
     assert body["review_payload"] is None
+
+
+def test_run_pipeline_falls_back_to_relative_scoring(monkeypatch):
+    _patch_pipeline_services(monkeypatch, eligible=False, alice_score=90, bob_score=70)
+
+    response = client.post("/pipeline/run", json=_run_payload())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "awaiting_review"
+    assert body["review_payload"]["used_relative_fallback"] is True
 
 
 def test_resume_pipeline_approve_persists(monkeypatch):

@@ -68,3 +68,24 @@ CREATE TABLE IF NOT EXISTS pipeline_reviews (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     resolved_at TIMESTAMP NULL
 );
+
+-- candidate_id is an opaque string, not a foreign key into `candidates` above (that
+-- table is recruiter-side, keyed by email, populated from screening runs). Job
+-- seeker identity is currently just a client-generated id stored in localStorage -
+-- see docs/PROJECT_OBJECTIVES.md's job-search recommendation notes. Job details are
+-- denormalized (job_title/company/location) rather than foreign-keyed, since the
+-- source jobs (SerpApi/Bright Data results) aren't persisted anywhere else and can
+-- disappear or change between searches.
+CREATE TABLE IF NOT EXISTS candidate_job_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    candidate_id VARCHAR(64) NOT NULL,
+    event_type ENUM('searched', 'viewed', 'applied', 'liked') NOT NULL,
+    query_text VARCHAR(255),
+    job_source VARCHAR(32),
+    job_external_id VARCHAR(255),
+    job_title VARCHAR(255),
+    company VARCHAR(255),
+    location VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_candidate_events (candidate_id, event_type, created_at)
+);

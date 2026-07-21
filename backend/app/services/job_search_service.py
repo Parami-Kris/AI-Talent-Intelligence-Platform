@@ -8,6 +8,7 @@ from urllib.parse import quote_plus
 import httpx
 from bs4 import BeautifulSoup
 
+from backend.app.candidate_job_events_repository import get_recommended_query, log_event
 from backend.app.query_expansion_repository import get_cached_expansion, save_expansion
 
 SERPAPI_BASE_URL = "https://serpapi.com/search"
@@ -208,7 +209,31 @@ def search_jobs(
     location: str | None = None,
     country: str = "us",
     results_per_page: int = 10,
+    candidate_id: str | None = None,
 ) -> dict:
+    used_query = query.strip()
+    recommended = False
+
+    if not used_query:
+        if candidate_id:
+            try:
+                used_query = get_recommended_query(candidate_id) or ""
+            except Exception:
+                used_query = ""  # history lookup must never block a real search
+        recommended = bool(used_query)
+        if not used_query:
+            raise ValueError(
+                "Enter a keyword to search. Once you've viewed, applied to, or liked a few jobs, "
+                "you'll be able to search with just your activity history."
+            )
+
+    if candidate_id:
+        try:
+            log_event(candidate_id, "searched", query_text=used_query)
+        except Exception:
+            pass  # history logging must never block a real search
+
+    query = used_query
     related_titles = expand_query(query)
     all_queries = [query] + [title for title in related_titles if title.strip().lower() != query.strip().lower()]
 
@@ -231,4 +256,10 @@ def search_jobs(
                 seen.add(key)
                 results.append(job)
 
-    return {"count": len(results), "results": results, "expanded_titles": related_titles}
+    return {
+        "count": len(results),
+        "results": results,
+        "expanded_titles": related_titles,
+        "used_query": query,
+        "recommended": recommended,
+    }

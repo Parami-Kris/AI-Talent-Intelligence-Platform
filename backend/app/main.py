@@ -1,7 +1,7 @@
 import os
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 
@@ -15,7 +15,8 @@ from backend.app.pipeline_review_repository import (
     mark_review_resolved,
     save_pending_review,
 )
-from backend.app.schemas.jobs import JobSearchResponse
+from backend.app.candidate_job_events_repository import log_event
+from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
     PipelineResumeResponse,
@@ -24,7 +25,9 @@ from backend.app.schemas.pipeline import (
 )
 from backend.app.schemas.ranking import (
     HealthResponse,
+    ParseUploadJobResponse,
     ParseUploadResponse,
+    ParseUploadStatusResponse,
     ProfileGapRequest,
     ProfileGapResponse,
     RankCandidatesRequest,
@@ -43,6 +46,7 @@ from backend.app.services.resume_intake_service import (
     parse_jd_upload,
     parse_resumes_batch,
 )
+from backend.app.upload_progress import complete_job, create_job, fail_job, get_job, update_progress
 
 
 app = FastAPI(
@@ -86,8 +90,25 @@ def rerank_shortlist(request: RerankShortlistRequest):
 
 
 @app.get("/jobs/search", response_model=JobSearchResponse)
-def search_jobs(query: str, location: str | None = None, country: str = "us"):
-    return search_jobs_service(query=query, location=location, country=country)
+def search_jobs(query: str = "", location: str | None = None, country: str = "us", candidate_id: str | None = None):
+    try:
+        return search_jobs_service(query=query, location=location, country=country, candidate_id=candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/jobs/events", response_model=JobEventResponse)
+def log_job_event(request: JobEventRequest):
+    log_event(
+        request.candidate_id,
+        request.event_type,
+        job_source=request.job_source,
+        job_external_id=request.job_external_id,
+        job_title=request.job_title,
+        company=request.company,
+        location=request.location,
+    )
+    return JobEventResponse()
 
 
 @app.post("/analyze-profile-gap", response_model=ProfileGapResponse)
@@ -156,6 +177,63 @@ async def upload_parse(
         )
 
     return {"jd": jd, "candidates": batch["candidates"], "failures": batch["failures"]}
+
+
+@app.post("/upload/parse/start", response_model=ParseUploadJobResponse)
+async def start_upload_parse(
+    background_tasks: BackgroundTasks,
+    jd_file: UploadFile = File(...),
+    resume_files: list[UploadFile] = File(...),
+):
+    jd_content = await jd_file.read()
+    jd_filename = jd_file.filename
+    files = [(await resume_file.read(), resume_file.filename) for resume_file in resume_files]
+
+    job_id = create_job(total=len(files))
+
+    def run_job():
+        try:
+            jd = parse_jd_upload(jd_content, jd_filename)
+        except ValueError as exc:
+            fail_job(job_id, str(exc))
+            return
+
+        batch = parse_resumes_batch(
+            files,
+            on_progress=lambda **kwargs: update_progress(job_id, **kwargs),
+        )
+
+        if not batch["candidates"]:
+            fail_job(job_id, "No resumes could be parsed.")
+            return
+
+        complete_job(job_id, {"jd": jd, "candidates": batch["candidates"], "failures": batch["failures"]})
+
+    # Starlette runs sync background callables in a worker thread, so this heavy
+    # Docling/Gemini work no longer blocks the event loop the way the original
+    # synchronous /upload/parse route did - /upload/parse/status stays responsive
+    # while it runs.
+    background_tasks.add_task(run_job)
+    return ParseUploadJobResponse(job_id=job_id, total=len(files))
+
+
+@app.get("/upload/parse/status/{job_id}", response_model=ParseUploadStatusResponse)
+def get_upload_parse_status(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"No upload job found for '{job_id}'.")
+
+    result = job.get("result") or {}
+    return ParseUploadStatusResponse(
+        status=job["status"],
+        total=job["total"],
+        processed=job["processed"],
+        current_filename=job["current_filename"],
+        failures=result.get("failures", []),
+        error=job.get("error"),
+        jd=result.get("jd"),
+        candidates=result.get("candidates"),
+    )
 
 
 @app.post("/pipeline/run", response_model=PipelineRunResponse)

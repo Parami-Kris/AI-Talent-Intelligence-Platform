@@ -5,28 +5,28 @@ from langgraph.types import Command
 from backend.app.pipeline.ranking_graph import extract_interrupt_payload, pipeline_graph
 
 
-def _batch_ranking(eligible=True):
+def _batch_ranking(eligible=True, alice_score=90, bob_score=70):
     alice_eligible = eligible
     return {
         "job_title": "Backend Engineer",
         "ranking_rule": "Eligible candidates first, then overall_score, then skill_score.",
         "summary": [
-            {"rank": 1, "candidate_name": "Alice", "is_eligible": alice_eligible, "overall_score": 90},
-            {"rank": 2, "candidate_name": "Bob", "is_eligible": eligible, "overall_score": 70},
+            {"rank": 1, "candidate_name": "Alice", "is_eligible": alice_eligible, "overall_score": alice_score},
+            {"rank": 2, "candidate_name": "Bob", "is_eligible": eligible, "overall_score": bob_score},
         ],
         "results": [
             {
                 "candidate_name": "Alice",
                 "email": "alice@example.com",
                 "is_eligible": alice_eligible,
-                "overall_score": 90,
+                "overall_score": alice_score,
                 "rank": 1,
             },
             {
                 "candidate_name": "Bob",
                 "email": "bob@example.com",
                 "is_eligible": eligible,
-                "overall_score": 70,
+                "overall_score": bob_score,
                 "rank": 2,
             },
         ],
@@ -92,9 +92,11 @@ def _initial_state(jd=None, candidates=None):
     }
 
 
-def _patch_pipeline_services(monkeypatch, *, eligible=True, rerank_calls=None, persist_calls=None):
+def _patch_pipeline_services(
+    monkeypatch, *, eligible=True, alice_score=90, bob_score=70, rerank_calls=None, persist_calls=None
+):
     def fake_rank(jd, candidates):
-        return _batch_ranking(eligible=eligible)
+        return _batch_ranking(eligible=eligible, alice_score=alice_score, bob_score=bob_score)
 
     def fake_rerank(jd, batch_rankings, candidates, top_n=10):
         if rerank_calls is not None:
@@ -120,6 +122,7 @@ def test_pauses_at_review_showing_shortlisted_and_other_candidates(monkeypatch):
     payload = extract_interrupt_payload(result)
     assert payload is not None
     assert payload["shortlist_size"] == 1
+    assert payload["used_relative_fallback"] is False
     shortlist_names = {item["candidate_name"] for item in payload["shortlist"]}
     other_names = {item["candidate_name"] for item in payload["other_candidates"]}
     assert shortlist_names == {"Alice"}
@@ -127,10 +130,17 @@ def test_pauses_at_review_showing_shortlisted_and_other_candidates(monkeypatch):
     assert persist_calls == []
 
 
-def test_no_eligible_candidates_short_circuits(monkeypatch):
+def test_no_eligible_candidates_short_circuits_when_also_below_relative_floor(monkeypatch):
     rerank_calls = []
     persist_calls = []
-    _patch_pipeline_services(monkeypatch, eligible=False, rerank_calls=rerank_calls, persist_calls=persist_calls)
+    _patch_pipeline_services(
+        monkeypatch,
+        eligible=False,
+        alice_score=40,
+        bob_score=20,
+        rerank_calls=rerank_calls,
+        persist_calls=persist_calls,
+    )
 
     result = pipeline_graph.invoke(_initial_state(), config=_config())
 
@@ -138,6 +148,52 @@ def test_no_eligible_candidates_short_circuits(monkeypatch):
     assert result["status"] == "no_eligible_candidates"
     assert rerank_calls == []
     assert persist_calls == []
+
+
+def test_relative_fallback_shortlists_when_no_one_hard_eligible_but_above_floor(monkeypatch):
+    # Alice (90) and Bob (70) both clear the relative-score floor (50) even though
+    # neither is hard-eligible - the pipeline should fall back to reranking from
+    # that pool instead of dead-ending, still capped by the requested top_n=1.
+    rerank_calls = []
+    persist_calls = []
+    _patch_pipeline_services(
+        monkeypatch,
+        eligible=False,
+        alice_score=90,
+        bob_score=70,
+        rerank_calls=rerank_calls,
+        persist_calls=persist_calls,
+    )
+
+    result = pipeline_graph.invoke(_initial_state(), config=_config())
+
+    payload = extract_interrupt_payload(result)
+    assert payload is not None
+    assert payload["used_relative_fallback"] is True
+    assert "relative scoring" in payload["message"]
+    assert len(rerank_calls) == 1
+    _batch_rankings_arg, top_n_arg = rerank_calls[0]
+    assert top_n_arg == 1, "requested top_n=1 still caps the fallback shortlist"
+    assert persist_calls == []
+
+
+def test_relative_fallback_caps_at_floor_qualifying_count_when_top_n_is_larger(monkeypatch):
+    # requested top_n=5 (larger than the batch) should not shortlist candidates
+    # who never cleared the relative-score floor in the first place - the cap
+    # here comes from the floor-qualifying count (2), not the requested top_n.
+    rerank_calls = []
+    _patch_pipeline_services(monkeypatch, eligible=False, alice_score=90, bob_score=70, rerank_calls=rerank_calls)
+
+    state = _initial_state()
+    state["top_n"] = 5
+
+    result = pipeline_graph.invoke(state, config=_config())
+
+    payload = extract_interrupt_payload(result)
+    assert payload is not None
+    assert len(rerank_calls) == 1
+    _batch_rankings_arg, top_n_arg = rerank_calls[0]
+    assert top_n_arg == 2, "only 2 candidates clear the relative-score floor, so top_n should cap there"
 
 
 def test_resume_approve_persists(monkeypatch):
