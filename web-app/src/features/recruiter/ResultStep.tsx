@@ -1,5 +1,5 @@
 import type { BatchRankingResult, PersistenceResult, RerankedResult } from '../../api/types'
-import { CandidateResultsView } from './components/CandidateResultsView'
+import { CandidateSplitView } from './components/CandidateSplitView'
 
 interface ResultStepProps {
   status: 'persisted' | 'rejected'
@@ -28,20 +28,22 @@ export function ResultStep({ status, reranked, persistenceResult, onStartNew }: 
       )}
 
       {reranked && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Final results
-          </h3>
-          <CandidateResultsView
-            rows={reranked.summary}
-            extraColumns={[
-              {
-                header: 'Manual add',
-                render: (row) => (row.manually_added ? <span title={row.override_reason as string}>Yes</span> : '—'),
-              },
-            ]}
-          />
-        </section>
+        <CandidateSplitView
+          fullResults={reranked.results}
+          groups={[
+            {
+              title: 'Final results',
+              rows: reranked.summary,
+              extraColumns: [
+                {
+                  header: 'Manual add',
+                  render: (row) =>
+                    row.manually_added ? <span title={row.override_reason as string}>Yes</span> : '—',
+                },
+              ],
+            },
+          ]}
+        />
       )}
 
       <button
@@ -63,7 +65,10 @@ export function NoEligibleStep({ batchRanking, onStartNew }: NoEligibleStepProps
         <strong>{batchRanking.job_title ?? 'this role'}</strong> — the shortlist reranking step was skipped.
       </div>
 
-      <CandidateResultsView rows={batchRanking.summary} emptyMessage="No candidates were ranked." />
+      <CandidateSplitView
+        fullResults={batchRanking.results}
+        groups={[{ title: 'Candidates', rows: batchRanking.summary, emptyMessage: 'No candidates were ranked.' }]}
+      />
 
       <button
         type="button"

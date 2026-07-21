@@ -9,6 +9,8 @@ interface CandidateResultsViewProps {
   onRowClick?: (row: CandidateSummary) => void
   rowActions?: (row: CandidateSummary) => ReactNode
   emptyMessage?: string
+  compareSelected?: Set<string>
+  onToggleCompare?: (row: CandidateSummary) => void
 }
 
 function toggleButtonClass(active: boolean) {
@@ -25,6 +27,8 @@ export function CandidateResultsView({
   onRowClick,
   rowActions,
   emptyMessage = 'No candidates.',
+  compareSelected,
+  onToggleCompare,
 }: CandidateResultsViewProps) {
   const [view, setView] = useState<'cards' | 'table'>('cards')
 
@@ -50,11 +54,20 @@ export function CandidateResultsView({
           onRowClick={onRowClick}
           rowActions={rowActions}
           emptyMessage={emptyMessage}
+          compareSelected={compareSelected}
+          onToggleCompare={onToggleCompare}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((row) => (
-            <CandidateCard key={row.candidate_name} row={row} onClick={onRowClick} actions={rowActions?.(row)} />
+            <CandidateCard
+              key={row.candidate_name}
+              row={row}
+              onClick={onRowClick}
+              actions={rowActions?.(row)}
+              compareChecked={compareSelected?.has(row.candidate_name)}
+              onToggleCompare={onToggleCompare}
+            />
           ))}
         </div>
       )}

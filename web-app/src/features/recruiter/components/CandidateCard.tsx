@@ -2,15 +2,17 @@ import type { ReactNode } from 'react'
 import type { CandidateSummary } from '../../../api/types'
 import { ScoreRing } from '../../../components/ScoreRing'
 import { SkillChips } from '../../../components/SkillChips'
-import { EligibilityBadge } from './EligibilityBadge'
+import { EligibilityBadge, JobStabilityBadge } from './EligibilityBadge'
 
 interface CandidateCardProps {
   row: CandidateSummary
   onClick?: (row: CandidateSummary) => void
   actions?: ReactNode
+  compareChecked?: boolean
+  onToggleCompare?: (row: CandidateSummary) => void
 }
 
-export function CandidateCard({ row, onClick, actions }: CandidateCardProps) {
+export function CandidateCard({ row, onClick, actions, compareChecked, onToggleCompare }: CandidateCardProps) {
   const score = row.final_score ?? row.overall_score
 
   return (
@@ -21,18 +23,31 @@ export function CandidateCard({ row, onClick, actions }: CandidateCardProps) {
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate font-semibold">{row.candidate_name}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <EligibilityBadge isEligible={row.is_eligible} />
-            {row.manually_added ? (
-              <span
-                title={typeof row.override_reason === 'string' ? row.override_reason : undefined}
-                className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-              >
-                Manually added
-              </span>
-            ) : null}
+        <div className="flex min-w-0 items-start gap-2">
+          {onToggleCompare && (
+            <input
+              type="checkbox"
+              checked={!!compareChecked}
+              onChange={() => onToggleCompare(row)}
+              onClick={(event) => event.stopPropagation()}
+              title="Select for comparison"
+              className="mt-1 h-4 w-4 shrink-0 accent-indigo-600"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-semibold">{row.candidate_name}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <EligibilityBadge isEligible={row.is_eligible} />
+              <JobStabilityBadge flag={row.job_stability_flag} />
+              {row.manually_added ? (
+                <span
+                  title={typeof row.override_reason === 'string' ? row.override_reason : undefined}
+                  className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                >
+                  Manually added
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
         <ScoreRing score={score} />

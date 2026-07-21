@@ -10,8 +10,7 @@ import type {
 } from '../../api/types'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { ActionBar } from './components/ActionBar'
-import { CandidateDetailDrawer } from './components/CandidateDetailDrawer'
-import { CandidateResultsView } from './components/CandidateResultsView'
+import { CandidateSplitView } from './components/CandidateSplitView'
 import { ManualAddModal } from './components/ManualAddModal'
 import { ScoreBadge } from './components/EligibilityBadge'
 
@@ -23,7 +22,6 @@ interface ReviewStepProps {
 }
 
 export function ReviewStep({ threadId, batchRanking, reviewPayload, onResumed }: ReviewStepProps) {
-  const [detailRow, setDetailRow] = useState<CandidateSummary | null>(null)
   const [addCandidate, setAddCandidate] = useState<CandidateSummary | null>(null)
   const [pendingManualAdditions, setPendingManualAdditions] = useState<ManualAddition[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -57,57 +55,59 @@ export function ReviewStep({ threadId, batchRanking, reviewPayload, onResumed }:
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-semibold">Review shortlist — {reviewPayload.job_title ?? 'Untitled role'}</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{reviewPayload.message}</p>
+        {reviewPayload.used_relative_fallback ? (
+          <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            {reviewPayload.message}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600 dark:text-gray-400">{reviewPayload.message}</p>
+        )}
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Shortlisted — LLM reranked ({reviewPayload.shortlist.length})
-        </h3>
-        <CandidateResultsView
-          rows={reviewPayload.shortlist}
-          onRowClick={setDetailRow}
-          extraColumns={[
-            {
-              header: 'Relevance',
-              render: (row) => <ScoreBadge label="Relevance" score={row.experience_relevance_score} />,
+      <CandidateSplitView
+        fullResults={batchRanking.results}
+        groups={[
+          {
+            title: 'Shortlisted — LLM reranked',
+            rows: reviewPayload.shortlist,
+            extraColumns: [
+              {
+                header: 'Relevance',
+                render: (row) => <ScoreBadge label="Relevance" score={row.experience_relevance_score} />,
+              },
+            ],
+          },
+          {
+            title: 'Other candidates — first-pass only',
+            rows: reviewPayload.other_candidates,
+            emptyMessage: 'Every candidate made the shortlist.',
+            rowActions: (row) => {
+              const alreadyPending = pendingManualAdditions.some(
+                (item) => item.candidate_name === row.candidate_name,
+              )
+              return alreadyPending ? (
+                <button
+                  type="button"
+                  onClick={() => removePending(row.candidate_name)}
+                  className="text-xs font-medium text-red-600 hover:underline"
+                >
+                  Remove
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddCandidate(row)}
+                  className="text-xs font-medium text-indigo-600 hover:underline"
+                >
+                  Add to shortlist
+                </button>
+              )
             },
-          ]}
-        />
-      </section>
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Other candidates — first-pass only ({reviewPayload.other_candidates.length})
-        </h3>
-        <CandidateResultsView
-          rows={reviewPayload.other_candidates}
-          onRowClick={setDetailRow}
-          emptyMessage="Every candidate made the shortlist."
-          rowActions={(row) => {
-            const alreadyPending = pendingManualAdditions.some((item) => item.candidate_name === row.candidate_name)
-            return alreadyPending ? (
-              <button
-                type="button"
-                onClick={() => removePending(row.candidate_name)}
-                className="text-xs font-medium text-red-600 hover:underline"
-              >
-                Remove
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAddCandidate(row)}
-                className="text-xs font-medium text-indigo-600 hover:underline"
-              >
-                Add to shortlist
-              </button>
-            )
-          }}
-        />
-      </section>
+          },
+        ]}
+      />
 
       {pendingManualAdditions.length > 0 && (
         <section className="space-y-2 rounded-md border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
@@ -137,14 +137,6 @@ export function ReviewStep({ threadId, batchRanking, reviewPayload, onResumed }:
         onApprove={handleApprove}
         onReject={handleReject}
       />
-
-      {detailRow && (
-        <CandidateDetailDrawer
-          summaryRow={detailRow}
-          fullResults={batchRanking.results}
-          onClose={() => setDetailRow(null)}
-        />
-      )}
 
       {addCandidate && (
         <ManualAddModal

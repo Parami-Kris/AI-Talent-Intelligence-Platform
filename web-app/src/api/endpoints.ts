@@ -2,9 +2,12 @@ import { getJson, postForm, postJson } from './client'
 import type {
   Candidate,
   Jd,
+  JobEventRequest,
   JobSearchResponse,
   ManualAddition,
+  ParseUploadJobResponse,
   ParseUploadResponse,
+  ParseUploadStatusResponse,
   PipelineResumeResponse,
   PipelineRunResponse,
   ProfileGapRequest,
@@ -16,6 +19,17 @@ export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUpl
   form.append('jd_file', jdFile)
   resumeFiles.forEach((file) => form.append('resume_files', file))
   return postForm<ParseUploadResponse>('/upload/parse', form)
+}
+
+export function startParseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadJobResponse> {
+  const form = new FormData()
+  form.append('jd_file', jdFile)
+  resumeFiles.forEach((file) => form.append('resume_files', file))
+  return postForm<ParseUploadJobResponse>('/upload/parse/start', form)
+}
+
+export function getParseUploadStatus(jobId: string): Promise<ParseUploadStatusResponse> {
+  return getJson<ParseUploadStatusResponse>(`/upload/parse/status/${jobId}`)
 }
 
 export interface RunPipelinePayload {
@@ -49,6 +63,11 @@ export function searchJobs(
   location?: string,
   country = 'us',
   signal?: AbortSignal,
+  candidateId?: string,
 ): Promise<JobSearchResponse> {
-  return getJson<JobSearchResponse>('/jobs/search', { query, location, country }, signal)
+  return getJson<JobSearchResponse>('/jobs/search', { query, location, country, candidate_id: candidateId }, signal)
+}
+
+export function logJobEvent(payload: JobEventRequest): Promise<void> {
+  return postJson<unknown>('/jobs/events', payload).then(() => undefined)
 }

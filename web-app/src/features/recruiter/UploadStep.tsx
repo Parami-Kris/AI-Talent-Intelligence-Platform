@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError, detailMessage } from '../../api/client'
-import { parseUpload, runPipeline } from '../../api/endpoints'
+import { getParseUploadStatus, runPipeline, startParseUpload } from '../../api/endpoints'
 import type { Candidate, Jd, PipelineRunResponse } from '../../api/types'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { FileInput } from '../../components/FileInput'
@@ -13,6 +13,22 @@ interface UploadStepProps {
 
 type Phase = 'idle' | 'parsing' | 'running'
 
+interface ParseProgress {
+  processed: number
+  total: number
+  currentFilename: string | null
+}
+
+const POLL_INTERVAL_MS = 3000
+
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  if (minutes === 0) return `${seconds}s`
+  if (seconds === 0) return `${minutes}m`
+  return `${minutes}m ${seconds}s`
+}
+
 export function UploadStep({ onPipelineRun }: UploadStepProps) {
   const [jdFile, setJdFile] = useState<File | null>(null)
   const [resumeFiles, setResumeFiles] = useState<File[]>([])
@@ -24,6 +40,45 @@ export function UploadStep({ onPipelineRun }: UploadStepProps) {
 
   // Cached so a failure in the pipeline-run phase doesn't require re-uploading files.
   const [parsed, setParsed] = useState<{ jd: Jd; candidates: Candidate[] } | null>(null)
+
+  const [parseProgress, setParseProgress] = useState<ParseProgress | null>(null)
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current)
+    }
+  }, [])
+
+  const pollParseJob = (jobId: string) =>
+    new Promise<{ jd: Jd; candidates: Candidate[]; failures: { filename: string; reason: string }[] }>(
+      (resolve, reject) => {
+        const poll = async () => {
+          let status
+          try {
+            status = await getParseUploadStatus(jobId)
+          } catch (err) {
+            reject(err)
+            return
+          }
+
+          setParseProgress({
+            processed: status.processed,
+            total: status.total,
+            currentFilename: status.current_filename,
+          })
+
+          if (status.status === 'done') {
+            resolve({ jd: status.jd!, candidates: status.candidates!, failures: status.failures })
+          } else if (status.status === 'error') {
+            reject(new Error(status.error ?? 'Failed to parse the uploaded files.'))
+          } else {
+            pollTimeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS)
+          }
+        }
+        poll()
+      },
+    )
 
   const runFromParsed = async (jd: Jd, candidates: Candidate[]) => {
     setPhase('running')
@@ -58,14 +113,25 @@ export function UploadStep({ onPipelineRun }: UploadStepProps) {
     }
 
     setPhase('parsing')
+    setParseProgress({ processed: 0, total: resumeFiles.length, currentFilename: null })
     try {
-      const parsedResult = await parseUpload(jdFile, resumeFiles)
+      const { job_id, total } = await startParseUpload(jdFile, resumeFiles)
+      setParseProgress({ processed: 0, total, currentFilename: null })
+      const parsedResult = await pollParseJob(job_id)
       setFailures(parsedResult.failures)
       setParsed({ jd: parsedResult.jd, candidates: parsedResult.candidates })
       await runFromParsed(parsedResult.jd, parsedResult.candidates)
     } catch (err) {
-      setError(err instanceof ApiError ? detailMessage(err.detail) : 'Failed to parse the uploaded files.')
+      setError(
+        err instanceof ApiError
+          ? detailMessage(err.detail)
+          : err instanceof Error
+            ? err.message
+            : 'Failed to parse the uploaded files.',
+      )
       setPhase('idle')
+    } finally {
+      setParseProgress(null)
     }
   }
 
@@ -159,11 +225,43 @@ export function UploadStep({ onPipelineRun }: UploadStepProps) {
           {parsed ? 'Retry ranking' : 'Upload & rank candidates'}
         </button>
 
-        {isBusy && (
-          <div className="space-y-1">
-            <LoadingSpinner label={phase === 'parsing' ? 'Parsing files…' : 'Running ranking pipeline…'} />
+        {phase === 'parsing' && parseProgress && (
+          <div className="space-y-2">
+            <LoadingSpinner label="Parsing resumes…" />
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+              <div
+                className="h-full rounded-full bg-indigo-600 transition-[width] duration-300 dark:bg-indigo-400"
+                style={{
+                  width: parseProgress.total
+                    ? `${Math.round((parseProgress.processed / parseProgress.total) * 100)}%`
+                    : '0%',
+                }}
+              />
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {elapsedSeconds}s elapsed — usually takes about {estimateLow}–{estimateHigh}s for {resumeCount} resume
+              {parseProgress.processed} of {parseProgress.total} resume
+              {parseProgress.total === 1 ? '' : 's'} parsed
+              {parseProgress.currentFilename ? ` — currently: ${parseProgress.currentFilename}` : ''}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {formatDuration(elapsedSeconds)} elapsed
+              {parseProgress.processed > 0
+                ? ` — about ${formatDuration(
+                    Math.round(
+                      (elapsedSeconds / parseProgress.processed) * (parseProgress.total - parseProgress.processed),
+                    ),
+                  )} remaining (est.)`
+                : ' — estimating time remaining…'}
+            </p>
+          </div>
+        )}
+
+        {phase === 'running' && (
+          <div className="space-y-1">
+            <LoadingSpinner label="Running ranking pipeline…" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {formatDuration(elapsedSeconds)} elapsed — usually takes about {formatDuration(estimateLow)}–
+              {formatDuration(estimateHigh)} for {resumeCount} resume
               {resumeCount === 1 ? '' : 's'}.
             </p>
           </div>

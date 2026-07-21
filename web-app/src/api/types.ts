@@ -23,6 +23,22 @@ export interface ParseUploadResponse {
   failures: { filename: string; reason: string }[]
 }
 
+export interface ParseUploadJobResponse {
+  job_id: string
+  total: number
+}
+
+export interface ParseUploadStatusResponse {
+  status: 'running' | 'done' | 'error'
+  total: number
+  processed: number
+  current_filename: string | null
+  failures: { filename: string; reason: string }[]
+  error?: string | null
+  jd?: Jd | null
+  candidates?: Candidate[] | null
+}
+
 export interface ScoreDetail {
   score: number | null
   matched?: string[]
@@ -41,6 +57,15 @@ export interface ExperienceRelevance {
   evidence?: string[]
 }
 
+export type JobStabilityFlag = 'stable' | 'frequent_job_changes' | 'insufficient_data'
+
+export interface JobStability {
+  job_count: number
+  average_tenure_years: number | null
+  short_stints_count: number
+  flag: JobStabilityFlag
+}
+
 export interface CandidateResult {
   candidate_name: string
   email?: string | null
@@ -55,10 +80,13 @@ export interface CandidateResult {
     experience?: ScoreDetail
     education?: ScoreDetail
   }
+  education_summary?: string[]
+  raw_text?: string | null
   rank?: number
   final_rank?: number
   final_score?: number
   experience_relevance?: ExperienceRelevance | null
+  job_stability?: JobStability | null
   manually_added?: boolean
   override_reason?: string
   added_by?: string | null
@@ -80,6 +108,9 @@ export interface CandidateSummary {
   experience_relevance_score?: number | null
   seniority_fit?: string | null
   domain_fit?: string | null
+  job_stability_flag?: JobStabilityFlag | null
+  average_tenure_years?: number | null
+  short_stints_count?: number
   [key: string]: unknown
 }
 
@@ -96,6 +127,7 @@ export interface ReviewPayload {
   shortlist_size: number
   shortlist: CandidateSummary[]
   other_candidates: CandidateSummary[]
+  used_relative_fallback?: boolean
   message: string
 }
 
@@ -172,6 +204,20 @@ export interface JobSearchResponse {
   count: number
   results: JobSearchResult[]
   expanded_titles: string[]
+  used_query: string
+  recommended: boolean
+}
+
+export type JobEventType = 'viewed' | 'applied' | 'liked'
+
+export interface JobEventRequest {
+  candidate_id: string
+  event_type: JobEventType
+  job_source?: string | null
+  job_external_id?: string | null
+  job_title?: string | null
+  company?: string | null
+  location?: string | null
 }
 
 export interface ProfileGapResponse {
