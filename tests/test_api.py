@@ -310,6 +310,43 @@ def test_search_jobs_endpoint_passes_candidate_id_through(monkeypatch):
     assert captured["candidate_id"] == "cand-1"
 
 
+def test_search_jobs_endpoint_defers_searched_logging_to_a_background_task(monkeypatch):
+    # Regression guard: this logging call must never run synchronously in the
+    # request path - it opens a fresh, unpooled connection to a remote DB, which
+    # previously added a real round trip to every /jobs/search call.
+    import backend.app.main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "search_jobs_service",
+        lambda **kwargs: {"count": 0, "results": [], "expanded_titles": [], "used_query": "ML Engineer", "recommended": False},
+    )
+    calls = []
+    monkeypatch.setattr(main_module, "log_searched_event_safely", lambda *a, **k: calls.append((a, k)))
+
+    response = client.get("/jobs/search", params={"query": "ML Engineer", "candidate_id": "cand-1"})
+
+    assert response.status_code == 200
+    assert calls == [(("cand-1", "ML Engineer"), {})]
+
+
+def test_search_jobs_endpoint_skips_logging_without_candidate_id(monkeypatch):
+    import backend.app.main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "search_jobs_service",
+        lambda **kwargs: {"count": 0, "results": [], "expanded_titles": [], "used_query": "ML Engineer", "recommended": False},
+    )
+    calls = []
+    monkeypatch.setattr(main_module, "log_searched_event_safely", lambda *a, **k: calls.append((a, k)))
+
+    response = client.get("/jobs/search", params={"query": "ML Engineer"})
+
+    assert response.status_code == 200
+    assert calls == []
+
+
 def test_log_job_event_endpoint_calls_repository(monkeypatch):
     import backend.app.main as main_module
 
@@ -326,6 +363,7 @@ def test_log_job_event_endpoint_calls_repository(monkeypatch):
             "job_title": "ML Engineer",
             "company": "Acme",
             "location": "Remote",
+            "job_url": "https://example.com/jobs/123",
         },
     )
 
@@ -340,6 +378,7 @@ def test_log_job_event_endpoint_calls_repository(monkeypatch):
                 "job_title": "ML Engineer",
                 "company": "Acme",
                 "location": "Remote",
+                "job_url": "https://example.com/jobs/123",
             },
         )
     ]
@@ -347,5 +386,36 @@ def test_log_job_event_endpoint_calls_repository(monkeypatch):
 
 def test_log_job_event_endpoint_rejects_invalid_event_type():
     response = client.post("/jobs/events", json={"candidate_id": "cand-1", "event_type": "bogus"})
+
+    assert response.status_code == 422
+
+
+def test_my_jobs_endpoint_calls_repository(monkeypatch):
+    import backend.app.main as main_module
+
+    fake_result = {
+        "liked": [
+            {
+                "source": "serpapi",
+                "id": "123",
+                "title": "ML Engineer",
+                "company": "Acme",
+                "location": "Remote",
+                "url": "https://example.com/jobs/123",
+                "created_at": "2026-07-20T10:00:00",
+            }
+        ],
+        "applied": [],
+    }
+    monkeypatch.setattr(main_module, "get_my_jobs", lambda candidate_id: fake_result)
+
+    response = client.get("/jobs/my-jobs", params={"candidate_id": "cand-1"})
+
+    assert response.status_code == 200
+    assert response.json() == fake_result
+
+
+def test_my_jobs_endpoint_requires_candidate_id():
+    response = client.get("/jobs/my-jobs")
 
     assert response.status_code == 422

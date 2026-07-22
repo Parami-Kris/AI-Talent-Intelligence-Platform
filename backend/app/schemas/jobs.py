@@ -30,7 +30,23 @@ class JobEventRequest(BaseModel):
     job_title: str | None = None
     company: str | None = None
     location: str | None = None
+    job_url: str | None = None
 
 
 class JobEventResponse(BaseModel):
     status: str = "ok"
+
+
+class MyJobEntry(BaseModel):
+    source: str | None
+    id: str | None
+    title: str | None
+    company: str | None
+    location: str | None
+    url: str | None
+    created_at: str | None
+
+
+class MyJobsResponse(BaseModel):
+    liked: list[MyJobEntry]
+    applied: list[MyJobEntry]

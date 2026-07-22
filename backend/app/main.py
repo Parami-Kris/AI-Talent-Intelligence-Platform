@@ -15,8 +15,8 @@ from backend.app.pipeline_review_repository import (
     mark_review_resolved,
     save_pending_review,
 )
-from backend.app.candidate_job_events_repository import log_event
-from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse
+from backend.app.candidate_job_events_repository import get_my_jobs, log_event
+from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse, MyJobsResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
     PipelineResumeResponse,
@@ -38,6 +38,7 @@ from backend.app.schemas.ranking import (
     SaveRankingsResponse,
     UploadRankCandidatesResponse,
 )
+from backend.app.services.job_search_service import log_searched_event_safely
 from backend.app.services.job_search_service import search_jobs as search_jobs_service
 from backend.app.services.profile_gap_service import analyze_profile_gap
 from backend.app.services.ranking_service import rank_candidates_for_jd
@@ -90,11 +91,24 @@ def rerank_shortlist(request: RerankShortlistRequest):
 
 
 @app.get("/jobs/search", response_model=JobSearchResponse)
-def search_jobs(query: str = "", location: str | None = None, country: str = "us", candidate_id: str | None = None):
+def search_jobs(
+    background_tasks: BackgroundTasks,
+    query: str = "",
+    location: str | None = None,
+    country: str = "us",
+    candidate_id: str | None = None,
+):
     try:
-        return search_jobs_service(query=query, location=location, country=country, candidate_id=candidate_id)
+        result = search_jobs_service(query=query, location=location, country=country, candidate_id=candidate_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if candidate_id:
+        # Deferred until after the response is sent - a synchronous DB write here
+        # previously added a real remote-DB round trip to every search request.
+        background_tasks.add_task(log_searched_event_safely, candidate_id, result["used_query"])
+
+    return result
 
 
 @app.post("/jobs/events", response_model=JobEventResponse)
@@ -107,8 +121,14 @@ def log_job_event(request: JobEventRequest):
         job_title=request.job_title,
         company=request.company,
         location=request.location,
+        job_url=request.job_url,
     )
     return JobEventResponse()
+
+
+@app.get("/jobs/my-jobs", response_model=MyJobsResponse)
+def my_jobs(candidate_id: str):
+    return get_my_jobs(candidate_id)
 
 
 @app.post("/analyze-profile-gap", response_model=ProfileGapResponse)

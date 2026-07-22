@@ -218,6 +218,22 @@ export interface JobEventRequest {
   job_title?: string | null
   company?: string | null
   location?: string | null
+  job_url?: string | null
+}
+
+export interface MyJobEntry {
+  source: string | null
+  id: string | null
+  title: string | null
+  company: string | null
+  location: string | null
+  url: string | null
+  created_at: string | null
+}
+
+export interface MyJobsResponse {
+  liked: MyJobEntry[]
+  applied: MyJobEntry[]
 }
 
 export interface ProfileGapResponse {

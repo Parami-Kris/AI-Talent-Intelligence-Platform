@@ -23,6 +23,12 @@ export function JobSearchResultsPage() {
   const [recommended, setRecommended] = useState(false)
   const [selected, setSelected] = useState<JobSearchResult | null>(null)
   const [likedKeys, setLikedKeys] = useState<Set<string>>(new Set())
+  const [appliedKeys, setAppliedKeys] = useState<Set<string>>(new Set())
+  // Which job (if any) is currently showing the "did you apply?" confirmation,
+  // shown right after clicking through to the original posting - we can't
+  // detect an actual application, so we ask rather than assume a click means
+  // they applied.
+  const [pendingApplyConfirm, setPendingApplyConfirm] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Cancels a still-in-flight search (rather than just ignoring its result) when a
@@ -42,6 +48,7 @@ export function JobSearchResultsPage() {
       job_title: job.title,
       company: job.company,
       location: job.location,
+      job_url: job.url,
     }).catch(() => {})
   }
 
@@ -55,6 +62,18 @@ export function JobSearchResultsPage() {
     setLikedKeys((prev) => new Set(prev).add(jobKey(job)))
     logEvent('liked', job)
   }
+
+  const handleViewPosting = (job: JobSearchResult) => {
+    if (!appliedKeys.has(jobKey(job))) setPendingApplyConfirm(jobKey(job))
+  }
+
+  const confirmApplied = (job: JobSearchResult) => {
+    setAppliedKeys((prev) => new Set(prev).add(jobKey(job)))
+    setPendingApplyConfirm(null)
+    logEvent('applied', job)
+  }
+
+  const dismissApplyConfirm = () => setPendingApplyConfirm(null)
 
   const handleSearch = async () => {
     activeSearchController.current?.abort()
@@ -110,9 +129,14 @@ export function JobSearchResultsPage() {
 
   return (
     <div className="space-y-4">
-      <Link to="/job-seeker" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-        ← Back to profile check
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link to="/job-seeker" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+          ← Back to profile check
+        </Link>
+        <Link to="/job-seeker/my-jobs" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+          My Jobs →
+        </Link>
+      </div>
 
       <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:flex-row">
         <input
@@ -222,15 +246,39 @@ export function JobSearchResultsPage() {
                     {[selected.company, selected.location].filter(Boolean).join(' · ')}
                   </p>
                   {selected.url && (
-                    <a
-                      href={selected.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => logEvent('applied', selected)}
-                      className="mt-2 inline-block text-sm text-indigo-600 hover:underline dark:text-indigo-400"
-                    >
-                      View original posting ↗
-                    </a>
+                    <div className="mt-2">
+                      <a
+                        href={selected.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => handleViewPosting(selected)}
+                        className="inline-block text-sm text-indigo-600 hover:underline dark:text-indigo-400"
+                      >
+                        View original posting ↗
+                      </a>
+                      {appliedKeys.has(jobKey(selected)) && (
+                        <p className="mt-1 text-xs font-medium text-green-700 dark:text-green-400">✓ Applied</p>
+                      )}
+                      {pendingApplyConfirm === jobKey(selected) && (
+                        <div className="mt-2 flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs dark:border-gray-800 dark:bg-gray-800/50">
+                          <span className="text-gray-600 dark:text-gray-400">Did you apply to this job?</span>
+                          <button
+                            type="button"
+                            onClick={() => confirmApplied(selected)}
+                            className="rounded-md bg-indigo-600 px-2 py-1 font-medium text-white hover:bg-indigo-700"
+                          >
+                            Yes, I applied
+                          </button>
+                          <button
+                            type="button"
+                            onClick={dismissApplyConfirm}
+                            className="rounded-md px-2 py-1 font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                          >
+                            Not yet
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 

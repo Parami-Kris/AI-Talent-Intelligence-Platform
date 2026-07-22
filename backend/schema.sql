@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS candidate_job_events (
     job_title VARCHAR(255),
     company VARCHAR(255),
     location VARCHAR(255),
+    job_url VARCHAR(1024),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_candidate_events (candidate_id, event_type, created_at)
 );

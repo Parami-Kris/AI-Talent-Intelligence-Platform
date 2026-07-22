@@ -1,4 +1,6 @@
-from backend.app.candidate_job_events_repository import pick_best_title
+from datetime import datetime
+
+from backend.app.candidate_job_events_repository import pick_best_title, shape_my_jobs_rows
 
 
 def test_pick_best_title_prefers_liked_over_applied_over_viewed():
@@ -30,3 +32,25 @@ def test_pick_best_title_ignores_zero_weight_event_types():
 
 def test_pick_best_title_returns_none_for_no_rows():
     assert pick_best_title([]) is None
+
+
+def test_shape_my_jobs_rows_maps_tuples_to_dicts():
+    rows = [
+        ("serpapi", "123", "ML Engineer", "Acme", "Remote", "https://example.com/123", datetime(2026, 7, 20, 10, 0, 0)),
+    ]
+
+    assert shape_my_jobs_rows(rows) == [
+        {
+            "source": "serpapi",
+            "id": "123",
+            "title": "ML Engineer",
+            "company": "Acme",
+            "location": "Remote",
+            "url": "https://example.com/123",
+            "created_at": "2026-07-20T10:00:00",
+        }
+    ]
+
+
+def test_shape_my_jobs_rows_handles_empty_list():
+    assert shape_my_jobs_rows([]) == []

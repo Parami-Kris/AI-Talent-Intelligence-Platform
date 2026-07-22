@@ -5,6 +5,7 @@ import type {
   JobEventRequest,
   JobSearchResponse,
   ManualAddition,
+  MyJobsResponse,
   ParseUploadJobResponse,
   ParseUploadResponse,
   ParseUploadStatusResponse,
@@ -70,4 +71,8 @@ export function searchJobs(
 
 export function logJobEvent(payload: JobEventRequest): Promise<void> {
   return postJson<unknown>('/jobs/events', payload).then(() => undefined)
+}
+
+export function getMyJobs(candidateId: string): Promise<MyJobsResponse> {
+  return getJson<MyJobsResponse>('/jobs/my-jobs', { candidate_id: candidateId })
 }
