@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
 type Theme = 'light' | 'dark'
 
@@ -63,13 +63,18 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <h1 className="text-lg font-semibold">AI Talent Intelligence Platform</h1>
+          <Link to="/" className="text-lg font-semibold hover:opacity-80">
+            AI Talent Intelligence Platform
+          </Link>
           <nav className="flex items-center gap-2 text-sm">
             <NavLink to="/recruiter" className={navLinkClass}>
               Recruiter Dashboard
             </NavLink>
-            <NavLink to="/job-seeker" className={navLinkClass}>
+            <NavLink to="/job-seeker" end className={navLinkClass}>
               Job Seeker
+            </NavLink>
+            <NavLink to="/job-seeker/my-jobs" className={navLinkClass}>
+              My Jobs
             </NavLink>
             <ThemeToggle />
           </nav>

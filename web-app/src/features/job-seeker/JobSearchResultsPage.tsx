@@ -129,14 +129,9 @@ export function JobSearchResultsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Link to="/job-seeker" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-          ← Back to profile check
-        </Link>
-        <Link to="/job-seeker/my-jobs" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-          My Jobs →
-        </Link>
-      </div>
+      <Link to="/job-seeker" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+        ← Back to profile check
+      </Link>
 
       <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:flex-row">
         <input

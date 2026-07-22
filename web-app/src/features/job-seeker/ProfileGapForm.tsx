@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { analyzeProfileGap, parseUpload } from '../../api/endpoints'
 import { ApiError, detailMessage } from '../../api/client'
 import type { ProfileGapResponse } from '../../api/types'
@@ -97,21 +97,13 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div className="space-y-3">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setShowJobSearch((current) => !current)}
-            className="flex-1 rounded-md border border-indigo-300 bg-indigo-50 px-4 py-2 text-center text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
-          >
-            {showJobSearch ? 'Hide job search' : 'Search real jobs'}
-          </button>
-          <Link
-            to="/job-seeker/my-jobs"
-            className="flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            My Jobs
-          </Link>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowJobSearch((current) => !current)}
+          className="w-full rounded-md border border-indigo-300 bg-indigo-50 px-4 py-2 text-center text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+        >
+          {showJobSearch ? 'Hide job search' : 'Search real jobs'}
+        </button>
 
         {showJobSearch && (
           <div className="flex flex-col gap-2 sm:flex-row">
