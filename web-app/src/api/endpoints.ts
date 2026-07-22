@@ -1,8 +1,9 @@
-import { getJson, postForm, postJson } from './client'
+import { deleteJson, getJson, postForm, postJson } from './client'
 import type {
   Candidate,
   Jd,
   JobEventRequest,
+  JobEventType,
   JobSearchResponse,
   ManualAddition,
   MyJobsResponse,
@@ -75,4 +76,10 @@ export function logJobEvent(payload: JobEventRequest): Promise<void> {
 
 export function getMyJobs(candidateId: string): Promise<MyJobsResponse> {
   return getJson<MyJobsResponse>('/jobs/my-jobs', { candidate_id: candidateId })
+}
+
+export function clearJobHistory(candidateId: string, eventType: JobEventType): Promise<void> {
+  return deleteJson<unknown>('/jobs/events', { candidate_id: candidateId, event_type: eventType }).then(
+    () => undefined,
+  )
 }

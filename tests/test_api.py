@@ -419,3 +419,28 @@ def test_my_jobs_endpoint_requires_candidate_id():
     response = client.get("/jobs/my-jobs")
 
     assert response.status_code == 422
+
+
+def test_clear_job_events_endpoint_calls_repository(monkeypatch):
+    import backend.app.main as main_module
+
+    calls = []
+    monkeypatch.setattr(main_module, "clear_events", lambda *a: calls.append(a))
+
+    response = client.delete("/jobs/events", params={"candidate_id": "cand-1", "event_type": "liked"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert calls == [("cand-1", "liked")]
+
+
+def test_clear_job_events_endpoint_rejects_invalid_event_type():
+    response = client.delete("/jobs/events", params={"candidate_id": "cand-1", "event_type": "searched"})
+
+    assert response.status_code == 422
+
+
+def test_clear_job_events_endpoint_requires_candidate_id():
+    response = client.delete("/jobs/events", params={"event_type": "liked"})
+
+    assert response.status_code == 422

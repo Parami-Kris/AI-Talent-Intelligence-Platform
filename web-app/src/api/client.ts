@@ -66,3 +66,12 @@ export function postJson<T>(path: string, body: unknown): Promise<T> {
 export function postForm<T>(path: string, form: FormData): Promise<T> {
   return request<T>(path, { method: 'POST', body: form })
 }
+
+export function deleteJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined) query.set(key, String(value))
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return request<T>(`${path}${suffix}`, { method: 'DELETE' })
+}

@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
@@ -15,7 +16,7 @@ from backend.app.pipeline_review_repository import (
     mark_review_resolved,
     save_pending_review,
 )
-from backend.app.candidate_job_events_repository import get_my_jobs, log_event
+from backend.app.candidate_job_events_repository import clear_events, get_my_jobs, log_event
 from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse, MyJobsResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
@@ -129,6 +130,12 @@ def log_job_event(request: JobEventRequest):
 @app.get("/jobs/my-jobs", response_model=MyJobsResponse)
 def my_jobs(candidate_id: str):
     return get_my_jobs(candidate_id)
+
+
+@app.delete("/jobs/events", response_model=JobEventResponse)
+def clear_job_events(candidate_id: str, event_type: Literal["viewed", "applied", "liked"]):
+    clear_events(candidate_id, event_type)
+    return JobEventResponse()
 
 
 @app.post("/analyze-profile-gap", response_model=ProfileGapResponse)

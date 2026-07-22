@@ -32,6 +32,18 @@ def log_event(
         )
 
 
+def clear_events(candidate_id, event_type):
+    """Deletes every event of the given type for a candidate - used by the My
+    Jobs page's "Clear" action on the Liked/Applied sections. Scoped to a single
+    event_type rather than wiping all history, so clearing "applied" doesn't
+    also erase "liked" (or vice versa).
+    """
+    query = "DELETE FROM candidate_job_events WHERE candidate_id = %s AND event_type = %s"
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(query, (candidate_id, event_type))
+
+
 def shape_my_jobs_rows(rows):
     """Pure row-to-dict mapping, split out from get_my_jobs so it's testable
     without a real DB connection. `rows` is (job_source, job_external_id,
