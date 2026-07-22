@@ -15,24 +15,11 @@ def _stub_search_pipeline(monkeypatch, *, expanded_titles=None, jobs_by_term=Non
 
 def test_search_jobs_with_explicit_query_does_not_touch_history(monkeypatch):
     _stub_search_pipeline(monkeypatch)
-    log_calls = []
-    monkeypatch.setattr(job_search_service, "log_event", lambda *a, **k: log_calls.append((a, k)))
 
     result = job_search_service.search_jobs("Backend Engineer")
 
     assert result["used_query"] == "Backend Engineer"
     assert result["recommended"] is False
-    assert log_calls == []  # no candidate_id supplied, nothing to log
-
-
-def test_search_jobs_logs_searched_event_when_candidate_id_given(monkeypatch):
-    _stub_search_pipeline(monkeypatch)
-    log_calls = []
-    monkeypatch.setattr(job_search_service, "log_event", lambda *a, **k: log_calls.append((a, k)))
-
-    job_search_service.search_jobs("Backend Engineer", candidate_id="cand-1")
-
-    assert log_calls == [(("cand-1", "searched"), {"query_text": "Backend Engineer"})]
 
 
 def test_search_jobs_raises_on_empty_query_without_candidate_id(monkeypatch):
@@ -53,14 +40,29 @@ def test_search_jobs_raises_on_empty_query_when_candidate_has_no_history(monkeyp
 def test_search_jobs_falls_back_to_recommended_query_when_empty(monkeypatch):
     _stub_search_pipeline(monkeypatch)
     monkeypatch.setattr(job_search_service, "get_recommended_query", lambda candidate_id: "ML Engineer")
-    log_calls = []
-    monkeypatch.setattr(job_search_service, "log_event", lambda *a, **k: log_calls.append((a, k)))
 
     result = job_search_service.search_jobs("", candidate_id="cand-1")
 
     assert result["used_query"] == "ML Engineer"
     assert result["recommended"] is True
-    assert log_calls == [(("cand-1", "searched"), {"query_text": "ML Engineer"})]
+
+
+def test_log_searched_event_safely_calls_log_event(monkeypatch):
+    calls = []
+    monkeypatch.setattr(job_search_service, "log_event", lambda *a, **k: calls.append((a, k)))
+
+    job_search_service.log_searched_event_safely("cand-1", "ML Engineer")
+
+    assert calls == [(("cand-1", "searched"), {"query_text": "ML Engineer"})]
+
+
+def test_log_searched_event_safely_swallows_errors(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr(job_search_service, "log_event", boom)
+
+    job_search_service.log_searched_event_safely("cand-1", "ML Engineer")  # must not raise
 
 
 def test_search_jobs_history_lookup_failure_does_not_crash_search(monkeypatch):

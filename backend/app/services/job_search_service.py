@@ -204,6 +204,19 @@ def _search_one_term(search_term: str, location: str | None, country: str, resul
     return batch
 
 
+def log_searched_event_safely(candidate_id: str, query_text: str) -> None:
+    """Meant to be scheduled as a FastAPI BackgroundTask (see main.py's /jobs/search
+    route) so it runs *after* the response is sent - log_event opens a fresh,
+    unpooled connection to a remote MySQL/TiDB instance per call, which previously
+    ran synchronously in the middle of every search request and added real
+    latency to every /jobs/search call regardless of candidate_id's presence.
+    """
+    try:
+        log_event(candidate_id, "searched", query_text=query_text)
+    except Exception:
+        pass  # history logging must never block or fail a real search
+
+
 def search_jobs(
     query: str,
     location: str | None = None,
@@ -226,12 +239,6 @@ def search_jobs(
                 "Enter a keyword to search. Once you've viewed, applied to, or liked a few jobs, "
                 "you'll be able to search with just your activity history."
             )
-
-    if candidate_id:
-        try:
-            log_event(candidate_id, "searched", query_text=used_query)
-        except Exception:
-            pass  # history logging must never block a real search
 
     query = used_query
     related_titles = expand_query(query)
