@@ -24,6 +24,7 @@ from backend.app.candidate_job_events_repository import clear_events, get_my_job
 from backend.app.ranking_repository import recruiter_has_screened
 from backend.app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from backend.app.schemas.comments import CommentCreateRequest, CommentListResponse, CommentResponse
+from backend.app.schemas.job_seeker_profile import ResumeResponse, SaveResumeRequest
 from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse, MyJobsResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
@@ -222,6 +223,20 @@ async def upload_rank_candidates(
     ranking = rank_candidates_for_jd(jd=jd, candidates=batch["candidates"])
     ranking["parse_failures"] = batch["failures"]
     return ranking
+
+
+@app.post("/upload/parse-jd")
+async def upload_parse_jd(jd_file: UploadFile = File(...)):
+    """JD-only parse, so a job seeker reusing their saved resume (see
+    /job-seeker/resume) doesn't have to re-upload a resume file just to parse
+    the JD they actually want analyzed - /upload/parse always required both.
+    """
+    jd_content = await jd_file.read()
+    try:
+        jd = parse_jd_upload(jd_content, jd_file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"jd": jd}
 
 
 @app.post("/upload/parse", response_model=ParseUploadResponse)
@@ -471,3 +486,19 @@ def create_candidate_comment(
     comment_id = add_comment(candidate_id, current_user["id"], request.comment_text, request.is_caution)
     comments = get_comments_for_candidate(candidate_id, current_user["id"])
     return next(comment for comment in comments if comment["id"] == comment_id)
+
+
+@app.get("/job-seeker/resume", response_model=ResumeResponse)
+def get_saved_resume(current_user: dict = Depends(require_role("job_seeker"))):
+    from backend.app.job_seeker_profile_repository import get_resume
+
+    resume = get_resume(current_user["id"])
+    return ResumeResponse(**resume) if resume else ResumeResponse()
+
+
+@app.put("/job-seeker/resume", response_model=ResumeResponse)
+def put_saved_resume(request: SaveResumeRequest, current_user: dict = Depends(require_role("job_seeker"))):
+    from backend.app.job_seeker_profile_repository import get_resume, save_resume
+
+    save_resume(current_user["id"], request.resume_filename, request.parsed_resume)
+    return ResumeResponse(**get_resume(current_user["id"]))

@@ -1,4 +1,4 @@
-import { deleteJson, getJson, patchJson, postForm, postJson } from './client'
+import { deleteJson, getJson, patchJson, postForm, postJson, putJson } from './client'
 import type {
   Candidate,
   CandidateComment,
@@ -20,6 +20,8 @@ import type {
   RegisterPayload,
   RunDetail,
   RunListResponse,
+  SavedResumeResponse,
+  SaveResumePayload,
   TokenResponse,
   User,
 } from './types'
@@ -61,6 +63,20 @@ export function addCandidateComment(
     comment_text: commentText,
     is_caution: isCaution,
   })
+}
+
+export function getSavedResume(): Promise<SavedResumeResponse> {
+  return getJson<SavedResumeResponse>('/job-seeker/resume')
+}
+
+export function saveResume(payload: SaveResumePayload): Promise<SavedResumeResponse> {
+  return putJson<SavedResumeResponse>('/job-seeker/resume', payload)
+}
+
+export function parseJdOnly(jdFile: File): Promise<{ jd: Jd }> {
+  const form = new FormData()
+  form.append('jd_file', jdFile)
+  return postForm<{ jd: Jd }>('/upload/parse-jd', form)
 }
 
 export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadResponse> {

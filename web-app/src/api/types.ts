@@ -304,6 +304,17 @@ export interface CommentListResponse {
   comments: CandidateComment[]
 }
 
+export interface SaveResumePayload {
+  resume_filename: string
+  parsed_resume: Candidate
+}
+
+export interface SavedResumeResponse {
+  resume_filename?: string | null
+  parsed_resume?: Candidate | null
+  updated_at?: string | null
+}
+
 export interface ProfileGapResponse {
   target_role: string | null
   candidate_name: string

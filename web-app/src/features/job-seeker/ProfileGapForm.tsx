@@ -1,8 +1,9 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { analyzeProfileGap, parseUpload } from '../../api/endpoints'
+import { analyzeProfileGap, getSavedResume, parseJdOnly, parseUpload, saveResume } from '../../api/endpoints'
 import { ApiError, detailMessage } from '../../api/client'
-import type { ProfileGapResponse } from '../../api/types'
+import type { Candidate, ProfileGapResponse } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { FileInput } from '../../components/FileInput'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
@@ -25,13 +26,32 @@ function segmentButtonClass(active: boolean) {
 
 export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isJobSeeker = user?.role === 'job_seeker'
   const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [savedResume, setSavedResume] = useState<{ filename: string; candidate: Candidate } | null>(null)
+  const [useSavedResume, setUseSavedResume] = useState(false)
   const [jdMode, setJdMode] = useState<JdMode>('upload')
   const [jdText, setJdText] = useState('')
   const [jdFile, setJdFile] = useState<File | null>(null)
   const [targetRole, setTargetRole] = useState('')
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isJobSeeker) return
+    let cancelled = false
+    getSavedResume()
+      .then((saved) => {
+        if (cancelled || !saved.parsed_resume) return
+        setSavedResume({ filename: saved.resume_filename ?? 'your saved resume', candidate: saved.parsed_resume })
+        setUseSavedResume(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [isJobSeeker])
 
   const [showJobSearch, setShowJobSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -57,7 +77,8 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
     event.preventDefault()
     setError(null)
 
-    if (!resumeFile) {
+    const reusingSavedResume = useSavedResume && !!savedResume
+    if (!reusingSavedResume && !resumeFile) {
       setError('Upload your resume.')
       return
     }
@@ -74,17 +95,30 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
     try {
       const jdFileToSend =
         jdMode === 'upload' ? jdFile! : new File([jdText], 'job_description.txt', { type: 'text/plain' })
-      const parsed = await parseUpload(jdFileToSend, [resumeFile])
-      if (parsed.candidates.length === 0) {
-        setError('Could not parse your resume. Try a different file.')
-        setPhase('idle')
-        return
+
+      let jd
+      let candidate: Candidate
+      if (reusingSavedResume) {
+        jd = (await parseJdOnly(jdFileToSend)).jd
+        candidate = savedResume!.candidate
+      } else {
+        const parsed = await parseUpload(jdFileToSend, [resumeFile!])
+        if (parsed.candidates.length === 0) {
+          setError('Could not parse your resume. Try a different file.')
+          setPhase('idle')
+          return
+        }
+        jd = parsed.jd
+        candidate = parsed.candidates[0]
+        if (isJobSeeker) {
+          saveResume({ resume_filename: resumeFile!.name, parsed_resume: candidate }).catch(() => {})
+        }
       }
 
       setPhase('analyzing')
       const result = await analyzeProfileGap({
-        jd: parsed.jd,
-        candidate: parsed.candidates[0],
+        jd,
+        candidate,
         target_role: targetRole.trim() || undefined,
       })
       onResult(result)
@@ -165,13 +199,44 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
           <label htmlFor="resume-file" className="block text-sm font-medium">
             Your resume
           </label>
-          <FileInput
-            id="resume-file"
-            accept=".txt,.pdf,.docx"
-            disabled={isBusy}
-            value={resumeFile ? [resumeFile] : []}
-            onChange={(files) => setResumeFile(files[0] ?? null)}
-          />
+          {savedResume && useSavedResume ? (
+            <div className="mt-1 flex items-center justify-between gap-3 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+              <span className="truncate">Using saved resume: {savedResume.filename}</span>
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => setUseSavedResume(false)}
+                className="shrink-0 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Upload a different one
+              </button>
+            </div>
+          ) : (
+            <>
+              <FileInput
+                id="resume-file"
+                accept=".txt,.pdf,.docx"
+                disabled={isBusy}
+                value={resumeFile ? [resumeFile] : []}
+                onChange={(files) => setResumeFile(files[0] ?? null)}
+              />
+              {savedResume && (
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => setUseSavedResume(true)}
+                  className="mt-1 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  Use saved resume ({savedResume.filename}) instead
+                </button>
+              )}
+              {isJobSeeker && !savedResume && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  We'll save this resume to your account so you don't have to re-upload it next time.
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         <div>
