@@ -5,6 +5,7 @@ import type {
   JobEventRequest,
   JobEventType,
   JobSearchResponse,
+  LoginPayload,
   ManualAddition,
   MyJobsResponse,
   ParseUploadJobResponse,
@@ -14,7 +15,22 @@ import type {
   PipelineRunResponse,
   ProfileGapRequest,
   ProfileGapResponse,
+  RegisterPayload,
+  TokenResponse,
+  User,
 } from './types'
+
+export function login(payload: LoginPayload): Promise<TokenResponse> {
+  return postJson<TokenResponse>('/auth/login', payload)
+}
+
+export function register(payload: RegisterPayload): Promise<TokenResponse> {
+  return postJson<TokenResponse>('/auth/register', payload)
+}
+
+export function getMe(): Promise<User> {
+  return getJson<User>('/auth/me')
+}
 
 export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadResponse> {
   const form = new FormData()

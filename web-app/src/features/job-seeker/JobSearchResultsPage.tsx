@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, detailMessage } from '../../api/client'
 import { logJobEvent, searchJobs } from '../../api/endpoints'
 import type { JobEventType, JobSearchResult } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
 import { ADZUNA_COUNTRIES } from '../../lib/adzunaCountries'
@@ -14,6 +15,8 @@ function jobKey(job: JobSearchResult): string {
 }
 
 export function JobSearchResultsPage() {
+  const { user } = useAuth()
+  const candidateId = getCandidateId(user?.role === 'job_seeker' ? user.id : undefined)
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState(() => searchParams.get('query') ?? '')
   const [location, setLocation] = useState(() => searchParams.get('location') ?? '')
@@ -41,7 +44,7 @@ export function JobSearchResultsPage() {
     // Fire-and-forget - history logging must never block or interrupt the actual
     // job-search flow.
     logJobEvent({
-      candidate_id: getCandidateId(),
+      candidate_id: candidateId,
       event_type: eventType,
       job_source: job.source,
       job_external_id: job.id,
@@ -88,7 +91,7 @@ export function JobSearchResultsPage() {
         location.trim() || undefined,
         country,
         controller.signal,
-        getCandidateId(),
+        candidateId,
       )
       setResults(response.results)
       setExpandedTitles(response.expanded_titles)

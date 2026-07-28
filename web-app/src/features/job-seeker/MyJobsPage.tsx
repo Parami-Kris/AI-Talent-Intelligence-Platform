@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, detailMessage } from '../../api/client'
 import { clearJobHistory, getMyJobs } from '../../api/endpoints'
 import type { MyJobEntry, MyJobsResponse } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
 import { getCandidateId } from '../../lib/candidateId'
@@ -42,6 +43,8 @@ function JobList({ jobs, emptyMessage }: { jobs: MyJobEntry[]; emptyMessage: str
 }
 
 export function MyJobsPage() {
+  const { user } = useAuth()
+  const candidateId = getCandidateId(user?.id)
   const [data, setData] = useState<MyJobsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +55,7 @@ export function MyJobsPage() {
     let cancelled = false
     setIsLoading(true)
     setError(null)
-    getMyJobs(getCandidateId())
+    getMyJobs(candidateId)
       .then((response) => {
         if (!cancelled) setData(response)
       })
@@ -66,12 +69,12 @@ export function MyJobsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [candidateId])
 
   const confirmClear = async (section: Section) => {
     setIsClearing(true)
     try {
-      await clearJobHistory(getCandidateId(), section)
+      await clearJobHistory(candidateId, section)
       setData((current) => (current ? { ...current, [section]: [] } : current))
     } catch (err) {
       setError(err instanceof ApiError ? detailMessage(err.detail) : `Failed to clear your ${section} history.`)

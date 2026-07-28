@@ -236,6 +236,33 @@ export interface MyJobsResponse {
   applied: MyJobEntry[]
 }
 
+export type UserRole = 'recruiter' | 'job_seeker'
+
+export interface User {
+  id: number
+  email: string
+  role: UserRole
+  display_name?: string | null
+}
+
+export interface LoginPayload {
+  email: string
+  password: string
+}
+
+export interface RegisterPayload {
+  email: string
+  password: string
+  role: UserRole
+  display_name?: string | null
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+  user: User
+}
+
 export interface ProfileGapResponse {
   target_role: string | null
   candidate_name: string

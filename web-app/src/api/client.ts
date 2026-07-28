@@ -1,5 +1,12 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
+export const AUTH_TOKEN_KEY = 'authToken'
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export class ApiError extends Error {
   status: number
   detail: unknown
@@ -22,7 +29,10 @@ export function detailMessage(detail: unknown): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${BASE_URL}${path}`, init)
+    response = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers: { ...authHeaders(), ...init?.headers },
+    })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new ApiError(0, `Could not reach the API at ${BASE_URL} — is the backend running?`)
@@ -65,6 +75,22 @@ export function postJson<T>(path: string, body: unknown): Promise<T> {
 
 export function postForm<T>(path: string, form: FormData): Promise<T> {
   return request<T>(path, { method: 'POST', body: form })
+}
+
+export function putJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function patchJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 export function deleteJson<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {

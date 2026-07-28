@@ -2,10 +2,13 @@ import os
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 
+from backend.app.auth.dependencies import get_current_user
+from backend.app.auth.security import create_access_token, hash_password, verify_password
+from backend.app.auth.users_repository import create_user, get_user_by_email
 from backend.app.pipeline.ranking_graph import (
     apply_review_decision,
     extract_interrupt_payload,
@@ -17,6 +20,7 @@ from backend.app.pipeline_review_repository import (
     save_pending_review,
 )
 from backend.app.candidate_job_events_repository import clear_events, get_my_jobs, log_event
+from backend.app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse, MyJobsResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
@@ -71,6 +75,39 @@ def health_check():
         "status": "ok",
         "service": "ai-talent-intelligence-api",
     }
+
+
+def _user_response(user: dict) -> UserResponse:
+    return UserResponse(id=user["id"], email=user["email"], role=user["role"], display_name=user.get("display_name"))
+
+
+@app.post("/auth/register", response_model=TokenResponse)
+def register(request: RegisterRequest):
+    if get_user_by_email(request.email) is not None:
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+
+    user_id = create_user(
+        email=request.email,
+        password_hash=hash_password(request.password),
+        role=request.role,
+        display_name=request.display_name,
+    )
+    user = {"id": user_id, "email": request.email, "role": request.role, "display_name": request.display_name}
+    return TokenResponse(access_token=create_access_token(user_id, request.role), user=_user_response(user))
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login(request: LoginRequest):
+    user = get_user_by_email(request.email)
+    if user is None or not verify_password(request.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
+    return TokenResponse(access_token=create_access_token(user["id"], user["role"]), user=_user_response(user))
+
+
+@app.get("/auth/me", response_model=UserResponse)
+def get_me(current_user: dict = Depends(get_current_user)):
+    return _user_response(current_user)
 
 
 @app.post("/rank-candidates", response_model=RankCandidatesResponse)

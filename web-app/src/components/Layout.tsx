@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
 
 type Theme = 'light' | 'dark'
 
@@ -58,7 +59,40 @@ function navLinkClass({ isActive }: { isActive: boolean }) {
   }`
 }
 
+function AuthNav() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  if (!user) {
+    return (
+      <NavLink to="/login" className={navLinkClass}>
+        Log in
+      </NavLink>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="hidden text-gray-500 dark:text-gray-400 sm:inline">
+        {user.display_name || user.email}
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          logout()
+          navigate('/login')
+        }}
+        className="rounded-md px-3 py-1.5 font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+      >
+        Log out
+      </button>
+    </div>
+  )
+}
+
 export function Layout({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -67,16 +101,23 @@ export function Layout({ children }: { children: ReactNode }) {
             AI Talent Intelligence Platform
           </Link>
           <nav className="flex items-center gap-2 text-sm">
-            <NavLink to="/recruiter" className={navLinkClass}>
-              Recruiter Dashboard
-            </NavLink>
-            <NavLink to="/job-seeker" end className={navLinkClass}>
-              Job Seeker
-            </NavLink>
-            <NavLink to="/job-seeker/my-jobs" className={navLinkClass}>
-              My Jobs
-            </NavLink>
+            {(!user || user.role === 'recruiter') && (
+              <NavLink to="/recruiter" className={navLinkClass}>
+                Recruiter Dashboard
+              </NavLink>
+            )}
+            {(!user || user.role === 'job_seeker') && (
+              <>
+                <NavLink to="/job-seeker" end className={navLinkClass}>
+                  Job Seeker
+                </NavLink>
+                <NavLink to="/job-seeker/my-jobs" className={navLinkClass}>
+                  My Jobs
+                </NavLink>
+              </>
+            )}
             <ThemeToggle />
+            <AuthNav />
           </nav>
         </div>
       </header>
