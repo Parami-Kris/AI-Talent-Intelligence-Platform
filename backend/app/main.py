@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Uplo
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 
-from backend.app.auth.dependencies import get_current_user, require_role
+from backend.app.auth.dependencies import get_current_user, get_optional_user, require_role
 from backend.app.auth.security import create_access_token, hash_password, verify_password
 from backend.app.auth.users_repository import create_user, get_user_by_email
 from backend.app.pipeline.ranking_graph import (
@@ -82,6 +82,26 @@ def health_check():
     }
 
 
+def _resolve_candidate_id(candidate_id: str, current_user: dict | None) -> str:
+    """The job-seeker history routes below accept a client-supplied
+    candidate_id for two reasons: logged-out browsing (an unguessable
+    crypto.randomUUID() from candidateId.ts, which needs no server-side check)
+    and logged-in accounts (a `user-{id}` string derived from the sequential
+    users.id - see candidateId.ts). The `user-` form is trivially enumerable,
+    so unlike the UUID form it MUST be verified against the actual
+    authenticated caller here, or anyone could read/forge/wipe another job
+    seeker's history by guessing small integers.
+    """
+    if candidate_id.startswith("user-"):
+        if (
+            current_user is None
+            or current_user["role"] != "job_seeker"
+            or f"user-{current_user['id']}" != candidate_id
+        ):
+            raise HTTPException(status_code=403, detail="candidate_id does not match the authenticated account.")
+    return candidate_id
+
+
 def _user_response(user: dict) -> UserResponse:
     return UserResponse(id=user["id"], email=user["email"], role=user["role"], display_name=user.get("display_name"))
 
@@ -140,7 +160,11 @@ def search_jobs(
     location: str | None = None,
     country: str = "us",
     candidate_id: str | None = None,
+    current_user: dict | None = Depends(get_optional_user),
 ):
+    if candidate_id:
+        candidate_id = _resolve_candidate_id(candidate_id, current_user)
+
     try:
         result = search_jobs_service(query=query, location=location, country=country, candidate_id=candidate_id)
     except ValueError as exc:
@@ -155,9 +179,10 @@ def search_jobs(
 
 
 @app.post("/jobs/events", response_model=JobEventResponse)
-def log_job_event(request: JobEventRequest):
+def log_job_event(request: JobEventRequest, current_user: dict | None = Depends(get_optional_user)):
+    candidate_id = _resolve_candidate_id(request.candidate_id, current_user)
     log_event(
-        request.candidate_id,
+        candidate_id,
         request.event_type,
         job_source=request.job_source,
         job_external_id=request.job_external_id,
@@ -170,12 +195,18 @@ def log_job_event(request: JobEventRequest):
 
 
 @app.get("/jobs/my-jobs", response_model=MyJobsResponse)
-def my_jobs(candidate_id: str):
+def my_jobs(candidate_id: str, current_user: dict | None = Depends(get_optional_user)):
+    candidate_id = _resolve_candidate_id(candidate_id, current_user)
     return get_my_jobs(candidate_id)
 
 
 @app.delete("/jobs/events", response_model=JobEventResponse)
-def clear_job_events(candidate_id: str, event_type: Literal["viewed", "applied", "liked"]):
+def clear_job_events(
+    candidate_id: str,
+    event_type: Literal["viewed", "applied", "liked"],
+    current_user: dict | None = Depends(get_optional_user),
+):
+    candidate_id = _resolve_candidate_id(candidate_id, current_user)
     clear_events(candidate_id, event_type)
     return JobEventResponse()
 

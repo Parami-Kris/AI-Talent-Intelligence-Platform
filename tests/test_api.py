@@ -421,6 +421,86 @@ def test_my_jobs_endpoint_requires_candidate_id():
     assert response.status_code == 422
 
 
+def _auth_headers(monkeypatch, user_id, role="job_seeker"):
+    # Regression coverage for the "user-{id}" candidate_id IDOR fix: a
+    # user-prefixed candidate_id must only be usable by the account it names,
+    # unlike the anonymous crypto.randomUUID() form (e.g. "cand-1" above),
+    # which needs no auth at all.
+    import backend.app.auth.dependencies as dependencies_module
+
+    monkeypatch.setenv("JWT_SECRET", "test-secret")
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_by_id",
+        lambda uid: {"id": uid, "email": f"user{uid}@example.com", "role": role, "display_name": None},
+    )
+    from backend.app.auth.security import create_access_token
+
+    token = create_access_token(user_id=user_id, role=role)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_my_jobs_rejects_user_prefixed_candidate_id_without_auth():
+    response = client.get("/jobs/my-jobs", params={"candidate_id": "user-2"})
+
+    assert response.status_code == 403
+
+
+def test_my_jobs_rejects_user_prefixed_candidate_id_for_a_different_account(monkeypatch):
+    headers = _auth_headers(monkeypatch, user_id=1)
+
+    response = client.get("/jobs/my-jobs", params={"candidate_id": "user-2"}, headers=headers)
+
+    assert response.status_code == 403
+
+
+def test_my_jobs_allows_user_prefixed_candidate_id_matching_the_authenticated_account(monkeypatch):
+    import backend.app.main as main_module
+
+    headers = _auth_headers(monkeypatch, user_id=1)
+    monkeypatch.setattr(main_module, "get_my_jobs", lambda candidate_id: {"liked": [], "applied": []})
+
+    response = client.get("/jobs/my-jobs", params={"candidate_id": "user-1"}, headers=headers)
+
+    assert response.status_code == 200
+
+
+def test_clear_job_events_rejects_user_prefixed_candidate_id_for_a_different_account(monkeypatch):
+    headers = _auth_headers(monkeypatch, user_id=1)
+
+    response = client.delete(
+        "/jobs/events", params={"candidate_id": "user-2", "event_type": "liked"}, headers=headers
+    )
+
+    assert response.status_code == 403
+
+
+def test_log_job_event_rejects_user_prefixed_candidate_id_for_a_different_account(monkeypatch):
+    headers = _auth_headers(monkeypatch, user_id=1)
+
+    response = client.post(
+        "/jobs/events",
+        json={"candidate_id": "user-2", "event_type": "liked"},
+        headers=headers,
+    )
+
+    assert response.status_code == 403
+
+
+def test_search_jobs_rejects_user_prefixed_candidate_id_without_auth(monkeypatch):
+    import backend.app.main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "search_jobs_service",
+        lambda **kwargs: {"count": 0, "results": [], "expanded_titles": [], "used_query": "", "recommended": False},
+    )
+
+    response = client.get("/jobs/search", params={"query": "ML Engineer", "candidate_id": "user-2"})
+
+    assert response.status_code == 403
+
+
 def test_clear_job_events_endpoint_calls_repository(monkeypatch):
     import backend.app.main as main_module
 
