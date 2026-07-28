@@ -1,4 +1,4 @@
-import { deleteJson, getJson, postForm, postJson } from './client'
+import { deleteJson, getJson, patchJson, postForm, postJson } from './client'
 import type {
   Candidate,
   Jd,
@@ -16,6 +16,8 @@ import type {
   ProfileGapRequest,
   ProfileGapResponse,
   RegisterPayload,
+  RunDetail,
+  RunListResponse,
   TokenResponse,
   User,
 } from './types'
@@ -30,6 +32,18 @@ export function register(payload: RegisterPayload): Promise<TokenResponse> {
 
 export function getMe(): Promise<User> {
   return getJson<User>('/auth/me')
+}
+
+export function listRuns(): Promise<RunListResponse> {
+  return getJson<RunListResponse>('/runs')
+}
+
+export function getRun(runId: number): Promise<RunDetail> {
+  return getJson<RunDetail>(`/runs/${runId}`)
+}
+
+export function setCandidateShortlisted(runId: number, candidateId: number, isShortlisted: boolean): Promise<unknown> {
+  return patchJson(`/runs/${runId}/candidates/${candidateId}/shortlist`, { is_shortlisted: isShortlisted })
 }
 
 export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadResponse> {

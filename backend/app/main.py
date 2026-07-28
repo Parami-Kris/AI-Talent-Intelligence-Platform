@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Uplo
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 
-from backend.app.auth.dependencies import get_current_user
+from backend.app.auth.dependencies import get_current_user, require_role
 from backend.app.auth.security import create_access_token, hash_password, verify_password
 from backend.app.auth.users_repository import create_user, get_user_by_email
 from backend.app.pipeline.ranking_graph import (
@@ -41,6 +41,7 @@ from backend.app.schemas.ranking import (
     RerankShortlistResponse,
     SaveRankingsRequest,
     SaveRankingsResponse,
+    ShortlistUpdateRequest,
     UploadRankCandidatesResponse,
 )
 from backend.app.services.job_search_service import log_searched_event_safely
@@ -301,7 +302,7 @@ def get_upload_parse_status(job_id: str):
 
 
 @app.post("/pipeline/run", response_model=PipelineRunResponse)
-def run_pipeline(request: PipelineRunRequest):
+def run_pipeline(request: PipelineRunRequest, current_user: dict = Depends(require_role("recruiter"))):
     thread_id = request.thread_id or str(uuid4())
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -312,6 +313,7 @@ def run_pipeline(request: PipelineRunRequest):
             "run_name": request.run_name,
             "source_file": request.source_file,
             "top_n": request.top_n,
+            "owner_id": current_user["id"],
         },
         config=config,
     )
@@ -331,6 +333,7 @@ def run_pipeline(request: PipelineRunRequest):
             run_name=request.run_name,
             source_file=request.source_file,
             top_n=request.top_n,
+            owner_id=current_user["id"],
         )
         return PipelineRunResponse(
             thread_id=thread_id,
@@ -347,7 +350,7 @@ def run_pipeline(request: PipelineRunRequest):
 
 
 @app.post("/pipeline/resume", response_model=PipelineResumeResponse)
-def resume_pipeline(request: PipelineResumeRequest):
+def resume_pipeline(request: PipelineResumeRequest, current_user: dict = Depends(require_role("recruiter"))):
     from backend.app.services.persistence_service import save_rankings_payload
 
     config = {"configurable": {"thread_id": request.thread_id}}
@@ -363,7 +366,11 @@ def resume_pipeline(request: PipelineResumeRequest):
     # restart/redeploy since /pipeline/run) - resume through the graph directly
     # and skip the MySQL read entirely. get_state() is a non-destructive check;
     # a non-empty `next` means this thread is genuinely paused at the interrupt.
-    if pipeline_graph.get_state(config).next:
+    state = pipeline_graph.get_state(config)
+    if state.next:
+        if state.values.get("owner_id") != current_user["id"]:
+            raise HTTPException(status_code=404, detail=f"No pending review found for thread_id '{request.thread_id}'.")
+
         result = pipeline_graph.invoke(Command(resume=decision), config=config)
         status = result.get("status", "rejected")
         mark_review_resolved(request.thread_id, status)
@@ -378,7 +385,7 @@ def resume_pipeline(request: PipelineResumeRequest):
     # this thread was already resolved) - read the pending state persisted to
     # MySQL at /pipeline/run time instead.
     pending = get_pending_review(request.thread_id)
-    if pending is None:
+    if pending is None or pending["owner_id"] != current_user["id"]:
         raise HTTPException(status_code=404, detail=f"No pending review found for thread_id '{request.thread_id}'.")
     if pending["status"] != "awaiting_review":
         raise HTTPException(
@@ -395,6 +402,7 @@ def resume_pipeline(request: PipelineResumeRequest):
         rankings=reranked,
         run_name=pending["run_name"] or "LangGraph pipeline run",
         source_file=pending["source_file"] or "langgraph_pipeline",
+        owner_id=pending["owner_id"],
     )
     mark_review_resolved(request.thread_id, "persisted")
 
@@ -404,3 +412,38 @@ def resume_pipeline(request: PipelineResumeRequest):
         reranked=reranked,
         persistence_result=persistence_result,
     )
+
+
+@app.get("/runs")
+def list_runs(current_user: dict = Depends(require_role("recruiter"))):
+    from backend.app.ranking_repository import list_runs_for_owner
+
+    return {"runs": list_runs_for_owner(current_user["id"])}
+
+
+@app.get("/runs/{run_id}")
+def get_run(run_id: int, current_user: dict = Depends(require_role("recruiter"))):
+    from backend.app.ranking_repository import get_run_detail
+
+    run = get_run_detail(run_id, current_user["id"])
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"No run found with id '{run_id}'.")
+    return run
+
+
+@app.patch("/runs/{run_id}/candidates/{candidate_id}/shortlist")
+def update_shortlist(
+    run_id: int,
+    candidate_id: int,
+    request: ShortlistUpdateRequest,
+    current_user: dict = Depends(require_role("recruiter")),
+):
+    from backend.app.ranking_repository import set_shortlisted
+
+    updated = set_shortlisted(run_id, candidate_id, current_user["id"], request.is_shortlisted)
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No candidate '{candidate_id}' found in run '{run_id}'.",
+        )
+    return {"run_id": run_id, "candidate_id": candidate_id, "is_shortlisted": request.is_shortlisted}

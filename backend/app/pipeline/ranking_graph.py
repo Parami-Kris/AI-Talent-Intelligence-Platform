@@ -13,6 +13,7 @@ class PipelineState(TypedDict, total=False):
     run_name: str
     source_file: str
     top_n: int
+    owner_id: int
     batch_ranking: dict[str, Any]
     eligible_count: int
     relative_shortlist_count: int
@@ -177,6 +178,7 @@ def persist_node(state: PipelineState) -> dict:
         rankings=state["reranked"],
         run_name=state.get("run_name", "LangGraph pipeline run"),
         source_file=state.get("source_file", "langgraph_pipeline"),
+        owner_id=state.get("owner_id"),
     )
     return {"persistence_result": result, "status": "persisted"}
 

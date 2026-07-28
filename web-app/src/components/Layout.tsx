@@ -102,9 +102,14 @@ export function Layout({ children }: { children: ReactNode }) {
           </Link>
           <nav className="flex items-center gap-2 text-sm">
             {(!user || user.role === 'recruiter') && (
-              <NavLink to="/recruiter" className={navLinkClass}>
-                Recruiter Dashboard
-              </NavLink>
+              <>
+                <NavLink to="/recruiter" className={navLinkClass}>
+                  Recruiter Dashboard
+                </NavLink>
+                <NavLink to="/recruiter/shortlists" className={navLinkClass}>
+                  Shortlists
+                </NavLink>
+              </>
             )}
             {(!user || user.role === 'job_seeker') && (
               <>

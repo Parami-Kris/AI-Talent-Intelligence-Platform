@@ -103,7 +103,7 @@ def _patch_pipeline_services(
             rerank_calls.append((batch_rankings, top_n))
         return _reranked(eligible=eligible)
 
-    def fake_persist(rankings, run_name, source_file="api_payload"):
+    def fake_persist(rankings, run_name, source_file="api_payload", owner_id=None):
         if persist_calls is not None:
             persist_calls.append(rankings)
         return {"run_id": 1, "saved_rankings": len(rankings.get("results", []))}
@@ -305,7 +305,7 @@ def test_resume_edit_with_manual_addition_appends_candidate_missing_from_reranke
         # Carol is intentionally omitted, unlike real merge_rerank_results.
         return _reranked(eligible=True)
 
-    def fake_persist(rankings, run_name, source_file="api_payload"):
+    def fake_persist(rankings, run_name, source_file="api_payload", owner_id=None):
         persist_calls.append(rankings)
         return {"run_id": 1, "saved_rankings": len(rankings.get("results", []))}
 

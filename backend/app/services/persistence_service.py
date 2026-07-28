@@ -13,12 +13,14 @@ def save_rankings_payload(
     rankings: dict[str, Any],
     run_name: str,
     source_file: str = "api_payload",
+    owner_id: int | None = None,
 ) -> dict[str, Any]:
     run_id = insert_screening_run(
         run_name=run_name,
         job_title=rankings.get("job_title"),
         ranking_rule=rankings.get("ranking_rule"),
         source_file=source_file,
+        owner_id=owner_id,
     )
 
     saved_rankings = 0

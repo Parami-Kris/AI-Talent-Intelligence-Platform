@@ -68,6 +68,8 @@ export interface JobStability {
 
 export interface CandidateResult {
   candidate_name: string
+  candidate_id?: number
+  is_shortlisted?: boolean
   email?: string | null
   is_eligible: boolean
   overall_score: number
@@ -261,6 +263,29 @@ export interface TokenResponse {
   access_token: string
   token_type: string
   user: User
+}
+
+export interface RunSummary {
+  id: number
+  run_name: string
+  job_title: string | null
+  source_file: string | null
+  created_at: string
+  candidate_count: number
+}
+
+export interface RunListResponse {
+  runs: RunSummary[]
+}
+
+export interface RunDetail {
+  id: number
+  run_name: string
+  job_title: string | null
+  ranking_rule: string | null
+  source_file: string | null
+  created_at: string
+  candidates: CandidateResult[]
 }
 
 export interface ProfileGapResponse {

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { BatchRankingResult, PersistenceResult, RerankedResult } from '../../api/types'
 import { CandidateSplitView } from './components/CandidateSplitView'
 
@@ -19,7 +20,12 @@ export function ResultStep({ status, reranked, persistenceResult, onStartNew }: 
       {status === 'persisted' ? (
         <div className="rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
           Screening run persisted — run #{persistenceResult?.run_id}, {persistenceResult?.saved_rankings}{' '}
-          candidate(s) saved.
+          candidate(s) saved.{' '}
+          {persistenceResult?.run_id != null && (
+            <Link to={`/recruiter/shortlists/${persistenceResult.run_id}`} className="font-medium underline underline-offset-2">
+              View in My Shortlists
+            </Link>
+          )}
         </div>
       ) : (
         <div className="rounded-md border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">

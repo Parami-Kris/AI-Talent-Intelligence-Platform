@@ -1,10 +1,14 @@
 from fastapi.testclient import TestClient
 
 import backend.app.main as main_module
+from backend.app.auth.dependencies import get_current_user
 from backend.app.main import app
 from tests.test_ranking_graph import _batch_ranking, _reranked
 
 client = TestClient(app)
+
+_FAKE_RECRUITER = {"id": 1, "email": "recruiter@example.com", "role": "recruiter", "display_name": None}
+app.dependency_overrides[get_current_user] = lambda: _FAKE_RECRUITER
 
 
 def _patch_pipeline_services(monkeypatch, *, eligible=True, alice_score=90, bob_score=70, persist_calls=None):
@@ -14,7 +18,7 @@ def _patch_pipeline_services(monkeypatch, *, eligible=True, alice_score=90, bob_
     def fake_rerank(jd, batch_rankings, candidates, top_n=10):
         return _reranked(eligible=eligible)
 
-    def fake_persist(rankings, run_name, source_file="api_payload"):
+    def fake_persist(rankings, run_name, source_file="api_payload", owner_id=None):
         if persist_calls is not None:
             persist_calls.append(rankings)
         return {"run_id": 1, "saved_rankings": len(rankings.get("results", []))}
@@ -27,7 +31,9 @@ def _patch_pipeline_services(monkeypatch, *, eligible=True, alice_score=90, bob_
     # matching this test suite's convention of mocking at the service boundary.
     fake_store: dict[str, dict] = {}
 
-    def fake_save_pending_review(thread_id, jd, candidates, batch_ranking, reranked, run_name, source_file, top_n):
+    def fake_save_pending_review(
+        thread_id, jd, candidates, batch_ranking, reranked, run_name, source_file, top_n, owner_id=None
+    ):
         fake_store[thread_id] = {
             "thread_id": thread_id,
             "jd": jd,
@@ -37,6 +43,7 @@ def _patch_pipeline_services(monkeypatch, *, eligible=True, alice_score=90, bob_
             "run_name": run_name,
             "source_file": source_file,
             "top_n": top_n,
+            "owner_id": owner_id,
             "status": "awaiting_review",
         }
 
@@ -209,6 +216,7 @@ def test_resume_pipeline_uses_durable_fallback_when_checkpoint_is_gone(monkeypat
         "run_name": "Durable fallback test",
         "source_file": "test",
         "top_n": 1,
+        "owner_id": _FAKE_RECRUITER["id"],
         "status": "awaiting_review",
     }
 

@@ -13,13 +13,14 @@ def save_pending_review(
     run_name: str,
     source_file: str,
     top_n: int,
+    owner_id: int | None = None,
 ) -> None:
     query = """
         INSERT INTO pipeline_reviews (
             thread_id, jd, candidates, batch_ranking, reranked,
-            run_name, source_file, top_n, status
+            run_name, source_file, top_n, owner_id, status
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'awaiting_review')
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'awaiting_review')
     """
     values = (
         thread_id,
@@ -30,6 +31,7 @@ def save_pending_review(
         run_name,
         source_file,
         top_n,
+        owner_id,
     )
 
     with get_connection() as connection:
@@ -40,7 +42,7 @@ def save_pending_review(
 def get_pending_review(thread_id: str) -> dict[str, Any] | None:
     query = """
         SELECT thread_id, jd, candidates, batch_ranking, reranked,
-               run_name, source_file, top_n, status
+               run_name, source_file, top_n, owner_id, status
         FROM pipeline_reviews
         WHERE thread_id = %s
     """
@@ -62,6 +64,7 @@ def get_pending_review(thread_id: str) -> dict[str, Any] | None:
         "run_name": row["run_name"],
         "source_file": row["source_file"],
         "top_n": row["top_n"],
+        "owner_id": row["owner_id"],
         "status": row["status"],
     }
 

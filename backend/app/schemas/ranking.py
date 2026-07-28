@@ -27,6 +27,10 @@ class SaveRankingsRequest(BaseModel):
     source_file: str = "api_payload"
 
 
+class ShortlistUpdateRequest(BaseModel):
+    is_shortlisted: bool
+
+
 class HealthResponse(BaseModel):
     status: str
     service: str
