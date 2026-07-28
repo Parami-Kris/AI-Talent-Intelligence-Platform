@@ -19,8 +19,11 @@ from backend.app.pipeline_review_repository import (
     mark_review_resolved,
     save_pending_review,
 )
+from backend.app.candidate_comments_repository import add_comment, get_comments_for_candidate
 from backend.app.candidate_job_events_repository import clear_events, get_my_jobs, log_event
+from backend.app.ranking_repository import recruiter_has_screened
 from backend.app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from backend.app.schemas.comments import CommentCreateRequest, CommentListResponse, CommentResponse
 from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse, MyJobsResponse
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
@@ -447,3 +450,24 @@ def update_shortlist(
             detail=f"No candidate '{candidate_id}' found in run '{run_id}'.",
         )
     return {"run_id": run_id, "candidate_id": candidate_id, "is_shortlisted": request.is_shortlisted}
+
+
+@app.get("/candidates/{candidate_id}/comments", response_model=CommentListResponse)
+def list_candidate_comments(candidate_id: int, current_user: dict = Depends(require_role("recruiter"))):
+    if not recruiter_has_screened(candidate_id, current_user["id"]):
+        raise HTTPException(status_code=404, detail=f"No candidate found with id '{candidate_id}'.")
+    return CommentListResponse(comments=get_comments_for_candidate(candidate_id, current_user["id"]))
+
+
+@app.post("/candidates/{candidate_id}/comments", response_model=CommentResponse)
+def create_candidate_comment(
+    candidate_id: int,
+    request: CommentCreateRequest,
+    current_user: dict = Depends(require_role("recruiter")),
+):
+    if not recruiter_has_screened(candidate_id, current_user["id"]):
+        raise HTTPException(status_code=404, detail=f"No candidate found with id '{candidate_id}'.")
+
+    comment_id = add_comment(candidate_id, current_user["id"], request.comment_text, request.is_caution)
+    comments = get_comments_for_candidate(candidate_id, current_user["id"])
+    return next(comment for comment in comments if comment["id"] == comment_id)

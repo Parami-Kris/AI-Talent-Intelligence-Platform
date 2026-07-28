@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 
+from pipeline.candidate_identity import normalize_email, normalize_phone
 from pipeline.matcher import MODEL_ID, client, jd_data
 
 from backend.app.utils.llm_json import parse_llm_json
@@ -21,12 +22,32 @@ def candidate_lookup(candidates):
     }
 
 
-def build_shortlist_payload(first_pass_results, candidates_by_name, top_n):
+def build_shortlist_payload(first_pass_results, candidates_by_name, top_n, prior_comments_by_contact=None):
+    """prior_comments_by_contact is {normalized_email_or_phone: [comment, ...]}
+    (see candidate_comments_repository.get_comments_by_contact) - a
+    deterministic lookup done by our code before this payload is ever built,
+    not something the LLM infers. Matched by this candidate's own email
+    first, falling back to phone only if the email had no match, mirroring
+    the lookup's own precedence. A candidate with no match gets an empty
+    list, meaning "no known history", not "clean history" - see
+    schema.sql's candidates table comment for why this can miss a real match.
+    """
+    prior_comments_by_contact = prior_comments_by_contact or {}
     shortlisted = first_pass_results[:top_n]
     payload = []
 
     for item in shortlisted:
         candidate = candidates_by_name.get(item["candidate_name"], {})
+
+        prior_comments = []
+        normalized_email = normalize_email(candidate.get("email"))
+        if normalized_email and normalized_email in prior_comments_by_contact:
+            prior_comments = prior_comments_by_contact[normalized_email]
+        else:
+            normalized_phone = normalize_phone(candidate.get("phone"))
+            if normalized_phone:
+                prior_comments = prior_comments_by_contact.get(normalized_phone, [])
+
         payload.append(
             {
                 "candidate_name": item["candidate_name"],
@@ -38,6 +59,7 @@ def build_shortlist_payload(first_pass_results, candidates_by_name, top_n):
                 "experience_years": item["match_scores"]["experience"]["years_experience"],
                 "experience": candidate.get("experience", []),
                 "projects": candidate.get("projects", []),
+                "prior_comments": prior_comments,
             }
         )
 
@@ -72,6 +94,15 @@ Scoring guidance:
 - 40-69: adjacent experience with meaningful gaps.
 - 0-39: years may exist, but domain/responsibility relevance is weak.
 
+Some candidates carry a `prior_comments` list - private notes a recruiter left
+about this same person from an earlier, unrelated screening (e.g. after an
+interview). Each has `comment_text` and `is_caution`. If any comment raises a
+real concern (poor interview performance, withdrew, misrepresented
+experience, etc.), set `recruiter_caution` to true and summarize why in
+`caution_reason`; otherwise set `recruiter_caution` to false and
+`caution_reason` to null. An empty `prior_comments` list means no comment
+history is on file - do not assume that means anything positive or negative.
+
 Return ONLY valid JSON as a list, one result per candidate:
 
 [
@@ -83,7 +114,9 @@ Return ONLY valid JSON as a list, one result per candidate:
     "reason": "Short evidence-based explanation",
     "matched": ["Relevant experience signals"],
     "missing": ["Relevant JD experience gaps"],
-    "evidence": ["Specific role, duration, responsibility, or project"]
+    "evidence": ["Specific role, duration, responsibility, or project"],
+    "recruiter_caution": false,
+    "caution_reason": null
   }}
 ]
 """
@@ -102,11 +135,34 @@ Return ONLY valid JSON as a list, one result per candidate:
                 "matched": [],
                 "missing": [],
                 "evidence": [],
+                "recruiter_caution": False,
+                "caution_reason": None,
             }
             for item in shortlist_payload
         ]
 
     return raw if isinstance(raw, list) else []
+
+
+def apply_caution_overrides(rerank_results, shortlist_payload):
+    """Belt-and-suspenders on top of the LLM's own recruiter_caution judgment:
+    if the recruiter explicitly checked "flag as caution" on any prior
+    comment for this candidate, force recruiter_caution=True regardless of
+    what the model produced, so an explicit recruiter flag is never silently
+    dropped by a soft LLM read. Mutates and returns rerank_results.
+    """
+    prior_comments_by_name = {
+        item["candidate_name"]: item.get("prior_comments", []) for item in shortlist_payload
+    }
+
+    for result in rerank_results:
+        comments = prior_comments_by_name.get(result.get("candidate_name"), [])
+        if any(comment.get("is_caution") for comment in comments):
+            result["recruiter_caution"] = True
+            if not result.get("caution_reason"):
+                result["caution_reason"] = "Recruiter flagged a concern in an earlier screening of this candidate."
+
+    return rerank_results
 
 
 def merge_rerank_results(first_pass, rerank_results):
@@ -176,6 +232,16 @@ def build_summary(final_results):
                 if item["experience_relevance"]
                 else None
             ),
+            "recruiter_caution": (
+                item["experience_relevance"].get("recruiter_caution", False)
+                if item["experience_relevance"]
+                else False
+            ),
+            "caution_reason": (
+                item["experience_relevance"].get("caution_reason")
+                if item["experience_relevance"]
+                else None
+            ),
         }
         for item in final_results
     ]
@@ -196,6 +262,7 @@ def main():
     first_pass_results = batch_rankings["results"]
     shortlist_payload = build_shortlist_payload(first_pass_results, candidates_by_name, args.top_n)
     rerank_results = rerank_experience_relevance(shortlist_payload, jd_data)
+    apply_caution_overrides(rerank_results, shortlist_payload)
     final_results = merge_rerank_results(first_pass_results, rerank_results)
 
     output = {

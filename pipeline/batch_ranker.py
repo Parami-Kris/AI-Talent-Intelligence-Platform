@@ -257,6 +257,7 @@ def rank_candidate(candidate, jd, edu_result):
     return {
         "candidate_name": candidate.get("name", "Unknown Candidate"),
         "email": candidate.get("email"),
+        "phone": candidate.get("phone"),
         "eligibility": eligibility,
         "is_eligible": is_eligible,
         "overall_score": overall_result["overall_score"],

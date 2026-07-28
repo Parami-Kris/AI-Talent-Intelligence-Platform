@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { CandidateSummary } from '../../../api/types'
+import { CautionBadge } from './CautionBadge'
 import { EligibilityBadge } from './EligibilityBadge'
 
 export interface CandidateTableColumn {
@@ -67,7 +68,10 @@ export function CandidateTable({
               )}
               <td className="px-3 py-2 font-medium">{row.candidate_name}</td>
               <td className="px-3 py-2">
-                <EligibilityBadge isEligible={row.is_eligible} />
+                <div className="flex flex-wrap items-center gap-1">
+                  <EligibilityBadge isEligible={row.is_eligible} />
+                  {row.recruiter_caution && <CautionBadge reason={row.caution_reason} />}
+                </div>
               </td>
               <td className="px-3 py-2">{row.final_score ?? row.overall_score ?? '—'}</td>
               {extraColumns.map((col) => (

@@ -15,7 +15,7 @@ def _patch_pipeline_services(monkeypatch, *, eligible=True, alice_score=90, bob_
     def fake_rank(jd, candidates):
         return _batch_ranking(eligible=eligible, alice_score=alice_score, bob_score=bob_score)
 
-    def fake_rerank(jd, batch_rankings, candidates, top_n=10):
+    def fake_rerank(jd, batch_rankings, candidates, top_n=10, owner_id=None):
         return _reranked(eligible=eligible)
 
     def fake_persist(rankings, run_name, source_file="api_payload", owner_id=None):

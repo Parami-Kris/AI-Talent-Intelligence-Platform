@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { CandidateSummary } from '../../../api/types'
 import { ScoreRing } from '../../../components/ScoreRing'
 import { SkillChips } from '../../../components/SkillChips'
+import { CautionBadge } from './CautionBadge'
 import { EligibilityBadge, JobStabilityBadge } from './EligibilityBadge'
 
 interface CandidateCardProps {
@@ -39,6 +40,7 @@ export function CandidateCard({ row, onClick, actions, compareChecked, onToggleC
             <div className="mt-1 flex flex-wrap items-center gap-1">
               <EligibilityBadge isEligible={row.is_eligible} />
               <JobStabilityBadge flag={row.job_stability_flag} />
+              {row.recruiter_caution && <CautionBadge reason={row.caution_reason} />}
               {row.manually_added ? (
                 <span
                   title={typeof row.override_reason === 'string' ? row.override_reason : undefined}

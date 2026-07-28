@@ -1,5 +1,6 @@
 from pipeline import shortlist_reranker
 from pipeline.shortlist_reranker import (
+    apply_caution_overrides,
     build_shortlist_payload,
     build_summary,
     candidate_lookup,
@@ -37,6 +38,88 @@ def test_build_shortlist_payload_limits_to_top_n():
 
     assert len(payload) == 2
     assert payload[0]["candidate_name"] == "Candidate 1"
+
+
+def test_build_shortlist_payload_attaches_prior_comments_by_normalized_email():
+    first_pass_results = [
+        {
+            "candidate_name": "Alice",
+            "rank": 1,
+            "overall_score": 90,
+            "is_eligible": True,
+            "eligibility": {"missing_must_haves": []},
+            "match_scores": {"skills": {"matched": []}, "experience": {"years_experience": 2}},
+        }
+    ]
+    candidates_by_name = {"Alice": {"email": "Alice@Example.com"}}
+    prior_comments_by_contact = {"alice@example.com": [{"comment_text": "Great in interview.", "is_caution": False}]}
+
+    payload = build_shortlist_payload(first_pass_results, candidates_by_name, top_n=1,
+                                       prior_comments_by_contact=prior_comments_by_contact)
+
+    assert payload[0]["prior_comments"] == [{"comment_text": "Great in interview.", "is_caution": False}]
+
+
+def test_build_shortlist_payload_falls_back_to_phone_when_email_has_no_match():
+    first_pass_results = [
+        {
+            "candidate_name": "Bob",
+            "rank": 1,
+            "overall_score": 80,
+            "is_eligible": True,
+            "eligibility": {"missing_must_haves": []},
+            "match_scores": {"skills": {"matched": []}, "experience": {"years_experience": 2}},
+        }
+    ]
+    candidates_by_name = {"Bob": {"email": "bob@new-address.com", "phone": "+1 555-123-4567"}}
+    prior_comments_by_contact = {"5551234567": [{"comment_text": "Withdrew after offer.", "is_caution": True}]}
+
+    payload = build_shortlist_payload(first_pass_results, candidates_by_name, top_n=1,
+                                       prior_comments_by_contact=prior_comments_by_contact)
+
+    assert payload[0]["prior_comments"][0]["is_caution"] is True
+
+
+def test_build_shortlist_payload_defaults_to_empty_prior_comments():
+    first_pass_results = [
+        {
+            "candidate_name": "Carol",
+            "rank": 1,
+            "overall_score": 80,
+            "is_eligible": True,
+            "eligibility": {"missing_must_haves": []},
+            "match_scores": {"skills": {"matched": []}, "experience": {"years_experience": 2}},
+        }
+    ]
+    payload = build_shortlist_payload(first_pass_results, {"Carol": {}}, top_n=1)
+
+    assert payload[0]["prior_comments"] == []
+
+
+def test_apply_caution_overrides_forces_true_when_recruiter_flagged():
+    shortlist_payload = [
+        {
+            "candidate_name": "Alice",
+            "prior_comments": [{"comment_text": "Concerning behavior.", "is_caution": True}],
+        }
+    ]
+    rerank_results = [{"candidate_name": "Alice", "recruiter_caution": False, "caution_reason": None}]
+
+    apply_caution_overrides(rerank_results, shortlist_payload)
+
+    assert rerank_results[0]["recruiter_caution"] is True
+    assert rerank_results[0]["caution_reason"]
+
+
+def test_apply_caution_overrides_leaves_llm_judgment_when_no_caution_flagged():
+    shortlist_payload = [
+        {"candidate_name": "Alice", "prior_comments": [{"comment_text": "Solid.", "is_caution": False}]},
+    ]
+    rerank_results = [{"candidate_name": "Alice", "recruiter_caution": False, "caution_reason": None}]
+
+    apply_caution_overrides(rerank_results, shortlist_payload)
+
+    assert rerank_results[0]["recruiter_caution"] is False
 
 
 def test_merge_rerank_results_blends_scores_and_ranks():

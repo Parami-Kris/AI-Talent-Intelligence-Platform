@@ -98,7 +98,7 @@ def _patch_pipeline_services(
     def fake_rank(jd, candidates):
         return _batch_ranking(eligible=eligible, alice_score=alice_score, bob_score=bob_score)
 
-    def fake_rerank(jd, batch_rankings, candidates, top_n=10):
+    def fake_rerank(jd, batch_rankings, candidates, top_n=10, owner_id=None):
         if rerank_calls is not None:
             rerank_calls.append((batch_rankings, top_n))
         return _reranked(eligible=eligible)
@@ -301,7 +301,7 @@ def test_resume_edit_with_manual_addition_appends_candidate_missing_from_reranke
         )
         return batch
 
-    def fake_rerank(jd, batch_rankings, candidates, top_n=10):
+    def fake_rerank(jd, batch_rankings, candidates, top_n=10, owner_id=None):
         # Carol is intentionally omitted, unlike real merge_rerank_results.
         return _reranked(eligible=True)
 

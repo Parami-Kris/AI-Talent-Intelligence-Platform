@@ -1,6 +1,7 @@
 import json
 
 from backend.app.db import get_connection
+from pipeline.candidate_identity import normalize_email, normalize_phone
 
 
 def insert_screening_run(run_name, job_title, ranking_rule, source_file, owner_id=None):
@@ -15,9 +16,12 @@ def insert_screening_run(run_name, job_title, ranking_rule, source_file, owner_i
         return cursor.lastrowid
 
 
-def upsert_candidate(name, email):
+def upsert_candidate(name, email, phone=None):
     select_query = "SELECT id FROM candidates WHERE email = %s"
-    insert_query = "INSERT INTO candidates (name, email) VALUES (%s, %s)"
+    insert_query = """
+        INSERT INTO candidates (name, email, email_normalized, phone_normalized)
+        VALUES (%s, %s, %s, %s)
+    """
 
     with get_connection() as connection:
         cursor = connection.cursor()
@@ -28,7 +32,7 @@ def upsert_candidate(name, email):
             if row:
                 return row[0]
 
-        cursor.execute(insert_query, (name, email))
+        cursor.execute(insert_query, (name, email, normalize_email(email), normalize_phone(phone)))
         return cursor.lastrowid
 
 
@@ -181,6 +185,25 @@ def get_run_detail(run_id, owner_id):
         "created_at": _isoformat(run_row["created_at"]),
         "candidates": candidates,
     }
+
+
+def recruiter_has_screened(candidate_id, owner_id):
+    """Guards the candidate_comments routes: a recruiter may only read/add
+    comments on a candidate they've actually screened in one of their own
+    runs, not any candidate_id they can guess - candidates is a global table
+    (see its schema.sql comment), so this is the access-control boundary.
+    """
+    query = """
+        SELECT 1
+        FROM candidate_rankings cr
+        JOIN screening_runs sr ON sr.id = cr.run_id
+        WHERE cr.candidate_id = %s AND sr.owner_id = %s
+        LIMIT 1
+    """
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(query, (candidate_id, owner_id))
+        return cursor.fetchone() is not None
 
 
 def set_shortlisted(run_id, candidate_id, owner_id, is_shortlisted):

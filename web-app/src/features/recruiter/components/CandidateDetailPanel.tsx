@@ -1,6 +1,8 @@
 import type { CandidateResult, CandidateSummary, ScoreDetail } from '../../../api/types'
 import { ScoreRing } from '../../../components/ScoreRing'
 import { joinCandidateDetail } from '../lib/joinCandidateDetail'
+import { CandidateComments } from './CandidateComments'
+import { CautionBadge } from './CautionBadge'
 
 interface CandidateDetailPanelProps {
   summaryRow: CandidateSummary
@@ -103,6 +105,12 @@ export function CandidateDetailPanel({ summaryRow, fullResults, onClose }: Candi
 
       {!detail && <p className="text-sm text-gray-500 dark:text-gray-400">No detailed record found for this candidate.</p>}
 
+      {detail?.experience_relevance?.recruiter_caution && (
+        <div className="mb-4">
+          <CautionBadge reason={detail.experience_relevance.caution_reason} />
+        </div>
+      )}
+
       {detail && (
         <div className="space-y-4">
           {detail.manually_added && (
@@ -136,6 +144,7 @@ export function CandidateDetailPanel({ summaryRow, fullResults, onClose }: Candi
               </pre>
             </details>
           )}
+          {detail.candidate_id != null && <CandidateComments candidateId={detail.candidate_id} />}
         </div>
       )}
     </div>

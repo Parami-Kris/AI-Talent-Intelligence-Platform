@@ -55,6 +55,8 @@ export interface ExperienceRelevance {
   matched?: string[]
   missing?: string[]
   evidence?: string[]
+  recruiter_caution?: boolean
+  caution_reason?: string | null
 }
 
 export type JobStabilityFlag = 'stable' | 'frequent_job_changes' | 'insufficient_data'
@@ -71,6 +73,7 @@ export interface CandidateResult {
   candidate_id?: number
   is_shortlisted?: boolean
   email?: string | null
+  phone?: string | null
   is_eligible: boolean
   overall_score: number
   eligibility?: {
@@ -113,6 +116,8 @@ export interface CandidateSummary {
   job_stability_flag?: JobStabilityFlag | null
   average_tenure_years?: number | null
   short_stints_count?: number
+  recruiter_caution?: boolean
+  caution_reason?: string | null
   [key: string]: unknown
 }
 
@@ -286,6 +291,17 @@ export interface RunDetail {
   source_file: string | null
   created_at: string
   candidates: CandidateResult[]
+}
+
+export interface CandidateComment {
+  id: number
+  comment_text: string
+  is_caution: boolean
+  created_at: string
+}
+
+export interface CommentListResponse {
+  comments: CandidateComment[]
 }
 
 export interface ProfileGapResponse {

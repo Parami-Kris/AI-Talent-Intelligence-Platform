@@ -1,6 +1,8 @@
 import { deleteJson, getJson, patchJson, postForm, postJson } from './client'
 import type {
   Candidate,
+  CandidateComment,
+  CommentListResponse,
   Jd,
   JobEventRequest,
   JobEventType,
@@ -44,6 +46,21 @@ export function getRun(runId: number): Promise<RunDetail> {
 
 export function setCandidateShortlisted(runId: number, candidateId: number, isShortlisted: boolean): Promise<unknown> {
   return patchJson(`/runs/${runId}/candidates/${candidateId}/shortlist`, { is_shortlisted: isShortlisted })
+}
+
+export function getCandidateComments(candidateId: number): Promise<CommentListResponse> {
+  return getJson<CommentListResponse>(`/candidates/${candidateId}/comments`)
+}
+
+export function addCandidateComment(
+  candidateId: number,
+  commentText: string,
+  isCaution: boolean,
+): Promise<CandidateComment> {
+  return postJson<CandidateComment>(`/candidates/${candidateId}/comments`, {
+    comment_text: commentText,
+    is_caution: isCaution,
+  })
 }
 
 export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadResponse> {

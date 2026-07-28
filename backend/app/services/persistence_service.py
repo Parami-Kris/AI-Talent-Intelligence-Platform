@@ -28,6 +28,7 @@ def save_rankings_payload(
         candidate_id = upsert_candidate(
             name=result.get("candidate_name", "Unknown Candidate"),
             email=result.get("email"),
+            phone=result.get("phone"),
         )
         ranking_id = insert_candidate_ranking(run_id, candidate_id, result)
 

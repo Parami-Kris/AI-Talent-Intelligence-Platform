@@ -60,6 +60,7 @@ def rerank_node(state: PipelineState) -> dict:
         batch_rankings=state["batch_ranking"],
         candidates=state["candidates"],
         top_n=top_n,
+        owner_id=state.get("owner_id"),
     )
     return {"reranked": reranked, "status": "reranked", "used_relative_fallback": used_relative_fallback}
 
