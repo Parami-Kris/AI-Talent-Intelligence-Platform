@@ -4,9 +4,16 @@ from backend.app.db import get_connection
 
 
 def split_sql_statements(sql_text):
+    # Strip full-line "--" comments before splitting. schema.sql's trailing
+    # migration-notes block documents ALTER TABLE statements as comments (for
+    # a human to copy-paste against an already-existing DB, not for this
+    # script to execute against a fresh one) - those still contain semicolons,
+    # which would otherwise turn into bogus empty "statements" once split.
+    lines = [line for line in sql_text.splitlines() if not line.strip().startswith("--")]
+    cleaned = "\n".join(lines)
     return [
         statement.strip()
-        for statement in sql_text.split(";")
+        for statement in cleaned.split(";")
         if statement.strip()
     ]
 
