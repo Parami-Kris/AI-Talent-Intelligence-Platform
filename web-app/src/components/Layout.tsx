@@ -73,9 +73,11 @@ function AuthNav() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="hidden text-gray-500 dark:text-gray-400 sm:inline">
-        {user.display_name || user.email}
-      </span>
+      {user.role !== 'job_seeker' && (
+        <span className="hidden text-gray-500 dark:text-gray-400 sm:inline">
+          {user.display_name || user.email}
+        </span>
+      )}
       <button
         type="button"
         onClick={() => {
@@ -116,8 +118,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 <NavLink to="/job-seeker" end className={navLinkClass}>
                   Job Seeker
                 </NavLink>
+                <NavLink to="/job-seeker/matches" className={navLinkClass}>
+                  Job Matches
+                </NavLink>
                 <NavLink to="/job-seeker/my-jobs" className={navLinkClass}>
                   My Jobs
+                </NavLink>
+                <NavLink to="/job-seeker/profile" className={navLinkClass}>
+                  {user ? user.display_name || user.email : 'Profile'}
                 </NavLink>
               </>
             )}

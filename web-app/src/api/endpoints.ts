@@ -6,6 +6,7 @@ import type {
   Jd,
   JobEventRequest,
   JobEventType,
+  JobMatchesResponse,
   JobSearchResponse,
   LoginPayload,
   ManualAddition,
@@ -22,6 +23,8 @@ import type {
   RunListResponse,
   SavedResumeResponse,
   SaveResumePayload,
+  TailorResumePayload,
+  TailorResumeResponse,
   TokenResponse,
   User,
 } from './types'
@@ -79,6 +82,12 @@ export function parseJdOnly(jdFile: File): Promise<{ jd: Jd }> {
   return postForm<{ jd: Jd }>('/upload/parse-jd', form)
 }
 
+export function parseResumeOnly(resumeFile: File): Promise<{ candidate: Candidate }> {
+  const form = new FormData()
+  form.append('resume_file', resumeFile)
+  return postForm<{ candidate: Candidate }>('/upload/parse-resume', form)
+}
+
 export function parseUpload(jdFile: File, resumeFiles: File[]): Promise<ParseUploadResponse> {
   const form = new FormData()
   form.append('jd_file', jdFile)
@@ -121,6 +130,24 @@ export function resumePipeline(payload: ResumePipelinePayload): Promise<Pipeline
 
 export function analyzeProfileGap(payload: ProfileGapRequest): Promise<ProfileGapResponse> {
   return postJson<ProfileGapResponse>('/analyze-profile-gap', payload)
+}
+
+export function tailorResume(payload: TailorResumePayload): Promise<TailorResumeResponse> {
+  return postJson<TailorResumeResponse>('/tailor-resume', payload)
+}
+
+export function getJobMatches(
+  query: string,
+  location?: string,
+  country = 'us',
+  topN = 10,
+): Promise<JobMatchesResponse> {
+  return getJson<JobMatchesResponse>('/job-seeker/matches', {
+    query,
+    location,
+    country,
+    top_n: topN,
+  })
 }
 
 export function searchJobs(

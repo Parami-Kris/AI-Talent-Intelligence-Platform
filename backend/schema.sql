@@ -171,6 +171,19 @@ CREATE TABLE IF NOT EXISTS job_seeker_profiles (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- One row per user per day, incremented each time a personalized-matches batch
+-- scores N jobs. Enforces job_matching_service.JOB_MATCH_DAILY_LIMIT server-side
+-- - the Mistral/Groq quotas backing this feature are shared org-wide, not
+-- per-user, so without this a single active user could exhaust the platform's
+-- shared LLM budget for everyone else.
+CREATE TABLE IF NOT EXISTS job_match_usage (
+    user_id BIGINT NOT NULL,
+    usage_date DATE NOT NULL,
+    jobs_scored INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, usage_date),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Migrating an EXISTING database (e.g. the live TiDB Cloud instance) rather
 -- than creating a fresh one: this script's CREATE TABLE IF NOT EXISTS

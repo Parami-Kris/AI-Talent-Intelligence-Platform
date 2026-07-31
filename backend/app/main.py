@@ -26,6 +26,11 @@ from backend.app.schemas.auth import LoginRequest, RegisterRequest, TokenRespons
 from backend.app.schemas.comments import CommentCreateRequest, CommentListResponse, CommentResponse
 from backend.app.schemas.job_seeker_profile import ResumeResponse, SaveResumeRequest
 from backend.app.schemas.jobs import JobEventRequest, JobEventResponse, JobSearchResponse, MyJobsResponse
+from backend.app.schemas.matches import (
+    JobMatchesResponse,
+    TailorResumeRequest,
+    TailorResumeResponse,
+)
 from backend.app.schemas.pipeline import (
     PipelineResumeRequest,
     PipelineResumeResponse,
@@ -55,6 +60,7 @@ from backend.app.services.ranking_service import rank_candidates_for_jd
 from backend.app.services.reranking_service import rerank_shortlist_for_jd
 from backend.app.services.resume_intake_service import (
     parse_jd_upload,
+    parse_resume_upload,
     parse_resumes_batch,
 )
 from backend.app.upload_progress import complete_job, create_job, fail_job, get_job, update_progress
@@ -220,6 +226,13 @@ def profile_gap(request: ProfileGapRequest):
     )
 
 
+@app.post("/tailor-resume", response_model=TailorResumeResponse)
+def tailor_resume_endpoint(request: TailorResumeRequest):
+    from backend.app.services.resume_tailoring_service import tailor_resume
+
+    return tailor_resume(jd=request.jd, candidate=request.candidate, target_role=request.target_role)
+
+
 @app.post("/save-rankings", response_model=SaveRankingsResponse)
 def save_rankings(request: SaveRankingsRequest):
     from backend.app.services.persistence_service import save_rankings_payload
@@ -268,6 +281,20 @@ async def upload_parse_jd(jd_file: UploadFile = File(...)):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"jd": jd}
+
+
+@app.post("/upload/parse-resume")
+async def upload_parse_resume(resume_file: UploadFile = File(...)):
+    """Resume-only parse, mirroring /upload/parse-jd - lets the Profile page
+    save a resume on its own, without needing a JD to pair it with the way
+    /upload/parse always required.
+    """
+    resume_content = await resume_file.read()
+    try:
+        candidate = parse_resume_upload(resume_content, resume_file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"candidate": candidate}
 
 
 @app.post("/upload/parse", response_model=ParseUploadResponse)
@@ -533,3 +560,61 @@ def put_saved_resume(request: SaveResumeRequest, current_user: dict = Depends(re
 
     save_resume(current_user["id"], request.resume_filename, request.parsed_resume)
     return ResumeResponse(**get_resume(current_user["id"]))
+
+
+@app.get("/job-seeker/matches", response_model=JobMatchesResponse)
+def get_job_matches(
+    query: str = "",
+    location: str | None = None,
+    country: str = "us",
+    top_n: int = 10,
+    current_user: dict = Depends(require_role("job_seeker")),
+):
+    from backend.app.job_match_usage_repository import get_today_usage, increment_usage
+    from backend.app.job_seeker_profile_repository import get_resume
+    from backend.app.services.job_matching_service import (
+        JOB_MATCH_BATCH_CAP,
+        JOB_MATCH_DAILY_LIMIT,
+        score_jobs_for_resume,
+    )
+
+    resume = get_resume(current_user["id"])
+    if resume is None or not resume.get("parsed_resume"):
+        raise HTTPException(status_code=404, detail="Save a resume first to see personalized matches.")
+
+    used_today = get_today_usage(current_user["id"])
+    remaining = max(JOB_MATCH_DAILY_LIMIT - used_today, 0)
+    if remaining <= 0:
+        raise HTTPException(
+            status_code=429,
+            detail="You've reached today's job-matching limit. Try again tomorrow.",
+        )
+
+    # Server-side clamp, not just a UI hint - matches the daily quota and per-
+    # request batch cap regardless of what the client asked for.
+    capped_top_n = max(1, min(top_n, JOB_MATCH_BATCH_CAP, remaining))
+
+    try:
+        search_result = search_jobs_service(
+            query=query,
+            location=location,
+            country=country,
+            candidate_id=f"user-{current_user['id']}",
+            primary_source="brightdata",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    scored = score_jobs_for_resume(resume["parsed_resume"], search_result["results"])
+    scored.sort(
+        key=lambda job: job["match_percentage"] if job["match_percentage"] is not None else -1,
+        reverse=True,
+    )
+    top_results = scored[:capped_top_n]
+
+    increment_usage(current_user["id"], len(top_results))
+
+    return JobMatchesResponse(
+        results=top_results,
+        quota_remaining_today=max(remaining - len(top_results), 0),
+    )

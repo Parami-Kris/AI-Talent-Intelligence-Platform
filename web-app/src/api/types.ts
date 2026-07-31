@@ -207,6 +207,27 @@ export interface JobSearchResult {
   posted_at: string | null
 }
 
+export interface JobMatchResult extends JobSearchResult {
+  match_percentage: number | null
+  match_reason: string | null
+}
+
+export interface JobMatchesResponse {
+  results: JobMatchResult[]
+  quota_remaining_today: number
+}
+
+export interface TailorResumePayload {
+  jd: Jd
+  candidate: Candidate
+  target_role?: string | null
+}
+
+export interface TailorResumeResponse {
+  tailored_resume_text: string | null
+  summary_of_changes: string[]
+}
+
 export interface JobSearchResponse {
   count: number
   results: JobSearchResult[]

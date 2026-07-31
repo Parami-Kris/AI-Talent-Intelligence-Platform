@@ -4,7 +4,9 @@ import { LoginPage } from './auth/LoginPage'
 import { RegisterPage } from './auth/RegisterPage'
 import { RequireAuth } from './auth/RequireAuth'
 import { JobSearchResultsPage } from './features/job-seeker/JobSearchResultsPage'
+import { MatchesPage } from './features/job-seeker/MatchesPage'
 import { MyJobsPage } from './features/job-seeker/MyJobsPage'
+import { ProfilePage } from './features/job-seeker/ProfilePage'
 import { ShortlistDetailPage } from './features/recruiter/ShortlistDetailPage'
 import { ShortlistsPage } from './features/recruiter/ShortlistsPage'
 import { JobSeekerPage } from './routes/JobSeekerPage'
@@ -52,6 +54,22 @@ function App() {
           element={
             <RequireAuth role="job_seeker">
               <MyJobsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/job-seeker/matches"
+          element={
+            <RequireAuth role="job_seeker">
+              <MatchesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/job-seeker/profile"
+          element={
+            <RequireAuth role="job_seeker">
+              <ProfilePage />
             </RequireAuth>
           }
         />
