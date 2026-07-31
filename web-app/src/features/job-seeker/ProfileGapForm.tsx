@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { analyzeProfileGap, getSavedResume, parseJdOnly, parseUpload, saveResume } from '../../api/endpoints'
 import { ApiError, detailMessage } from '../../api/client'
 import type { Candidate, ProfileGapResponse } from '../../api/types'
@@ -7,7 +7,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { FileInput } from '../../components/FileInput'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
-import { ADZUNA_COUNTRIES } from '../../lib/adzunaCountries'
+import { JOB_SEARCH_COUNTRIES } from '../../lib/jobSearchCountries'
 
 interface ProfileGapFormProps {
   onResult: (result: ProfileGapResponse) => void
@@ -162,7 +162,7 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
               onChange={(event) => setSearchCountry(event.target.value)}
               className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
             >
-              {ADZUNA_COUNTRIES.map((option) => (
+              {JOB_SEARCH_COUNTRIES.map((option) => (
                 <option key={option.code} value={option.code}>
                   {option.label}
                 </option>
@@ -232,10 +232,21 @@ export function ProfileGapForm({ onResult }: ProfileGapFormProps) {
               )}
               {isJobSeeker && !savedResume && (
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  We'll save this resume to your account so you don't have to re-upload it next time.
+                  We'll save this resume to your account so you don't have to re-upload it next time, or{' '}
+                  <Link to="/job-seeker/profile" className="text-indigo-600 hover:underline dark:text-indigo-400">
+                    save one from your Profile
+                  </Link>
+                  .
                 </p>
               )}
             </>
+          )}
+          {isJobSeeker && savedResume && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <Link to="/job-seeker/profile" className="text-indigo-600 hover:underline dark:text-indigo-400">
+                Manage your saved resume
+              </Link>
+            </p>
           )}
         </div>
 

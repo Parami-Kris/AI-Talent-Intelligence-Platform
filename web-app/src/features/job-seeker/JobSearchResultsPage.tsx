@@ -6,7 +6,7 @@ import type { JobEventType, JobSearchResult } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { ErrorBanner } from '../../components/ErrorBanner'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
-import { ADZUNA_COUNTRIES } from '../../lib/adzunaCountries'
+import { JOB_SEARCH_COUNTRIES } from '../../lib/jobSearchCountries'
 import { getCandidateId } from '../../lib/candidateId'
 import { JobFitCheck } from './JobFitCheck'
 
@@ -161,7 +161,7 @@ export function JobSearchResultsPage() {
           onChange={(event) => setCountry(event.target.value)}
           className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
         >
-          {ADZUNA_COUNTRIES.map((option) => (
+          {JOB_SEARCH_COUNTRIES.map((option) => (
             <option key={option.code} value={option.code}>
               {option.label}
             </option>

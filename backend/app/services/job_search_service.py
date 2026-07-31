@@ -67,6 +67,222 @@ def _search_serpapi(query: str, location: str | None, country: str, results_per_
     return results
 
 
+def _fetch_via_bright_data(url: str) -> str | None:
+    """Fetches a URL through Bright Data's Web Unlocker product (full rendered
+    HTML, proxy-routed) and returns the raw response text, or None on any
+    failure (missing credentials, HTTP error). Shared by every Bright-Data-backed
+    scraper below - each just parses this differently for its own target site.
+    """
+    api_key = os.environ.get("BRIGHT_DATA_API_KEY")
+    zone = os.environ.get("BRIGHT_DATA_SERP_ZONE")
+    if not api_key or not zone:
+        return None
+
+    try:
+        response = httpx.post(
+            BRIGHT_DATA_REQUEST_URL,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"zone": zone, "url": url, "format": "raw"},
+            timeout=90,
+        )
+        response.raise_for_status()
+        return response.text
+    except httpx.HTTPError:
+        return None
+
+
+def _extract_balanced_json(text: str, start_marker: str) -> dict | None:
+    """Finds `start_marker` in `text`, then extracts the JSON object literal that
+    begins at the next `{` after it, using brace-depth counting (string-aware, so
+    braces inside quoted values don't throw off the count) rather than a regex -
+    sites embed page-state JSON in inline <script> blocks this way, and the blob
+    is too large/nested for a regex to reliably bound.
+    """
+    marker_index = text.find(start_marker)
+    if marker_index == -1:
+        return None
+    brace_start = text.find("{", marker_index)
+    if brace_start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(brace_start, len(text)):
+        char = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[brace_start : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+# Countries SerpApi's google_jobs engine rejects outright, and where Bright Data's
+# Google-Jobs-vertical scrape below is also confirmed empty (live-tested) - routed
+# straight to the locally-dominant job board for that market instead, scraped
+# directly via Bright Data. Checked in _search_one_term before either of the above.
+COUNTRY_JOB_BOARD_SCRAPERS = {}
+
+# Full-description scraping costs 1 (list page) + N (detail page) Bright Data
+# requests per search term, vs. 1 total for the Google-Jobs-vertical path - capped
+# independently of results_per_page to bound both latency and quota burn.
+LOCAL_BOARD_DETAIL_FETCH_CAP = 15
+
+
+def _search_indeed(query: str, location: str | None, country: str, results_per_page: int) -> list[dict]:
+    """Local job board scrape for SerpApi-unsupported countries where Indeed has
+    a country-specific site (confirmed live for `ie`). Two-stage: the search
+    results page embeds a JSON blob with short snippets, so each result's own
+    /viewjob page is fetched too, in parallel, for the full description.
+    """
+    search_url = f"https://{country}.indeed.com/jobs?q={quote_plus(query)}"
+    if location:
+        search_url += f"&l={quote_plus(location)}"
+
+    list_html = _fetch_via_bright_data(search_url)
+    if list_html is None:
+        return []
+
+    provider_data = _extract_balanced_json(list_html, 'window.mosaic.providerData["mosaic-provider-jobcards"]')
+    if not provider_data:
+        return []
+
+    cards = provider_data.get("metaData", {}).get("mosaicProviderJobCardsModel", {}).get("results", [])
+    cards = [card for card in cards if card.get("jobkey")][: min(results_per_page, LOCAL_BOARD_DETAIL_FETCH_CAP)]
+    if not cards:
+        return []
+
+    def fetch_one(card: dict) -> dict:
+        job_key = card["jobkey"]
+        job_url = f"https://{country}.indeed.com/viewjob?jk={job_key}"
+        description = card.get("snippet")
+        detail_html = _fetch_via_bright_data(job_url)
+        if detail_html:
+            try:
+                detail_soup = BeautifulSoup(detail_html, "lxml")
+            except Exception:
+                detail_soup = None
+            description_div = detail_soup.find("div", id="jobDescriptionText") if detail_soup else None
+            if description_div:
+                # Collapse the run of blank lines get_text() leaves behind for
+                # each closed <p>/<b> tag boundary in Indeed's markup.
+                description = re.sub(r"\n{3,}", "\n\n", description_div.get_text("\n")).strip()
+
+        return {
+            "source": "indeed",
+            "id": job_key,
+            "title": card.get("title"),
+            "company": card.get("company"),
+            "location": card.get("formattedLocation"),
+            "description": description,
+            "url": job_url,
+            "posted_at": None,
+        }
+
+    with ThreadPoolExecutor(max_workers=min(len(cards), 5)) as executor:
+        return list(executor.map(fetch_one, cards))
+
+
+COUNTRY_JOB_BOARD_SCRAPERS["ie"] = _search_indeed
+# Indeed also runs country-specific sites for au/nz (confirmed live, same
+# mosaic-provider-jobcards + jobDescriptionText structure as `ie`) - reuses
+# _search_indeed as-is rather than a SEEK-specific scraper, since SEEK's own
+# robots.txt disallows `*/job/*` (its individual job pages), which Bright
+# Data's standard access tier respects and blocks - confirmed live, "Request
+# Failed (bad_endpoint): ... not available for immediate access mode".
+COUNTRY_JOB_BOARD_SCRAPERS["au"] = _search_indeed
+COUNTRY_JOB_BOARD_SCRAPERS["nz"] = _search_indeed
+
+
+def _find_react_query_data(next_data: dict, query_key_prefix: str):
+    """pracuj.pl (Next.js + React Query) embeds page state as a list of
+    {queryKey, state: {data}} entries under dehydratedState.queries - finds the
+    first entry whose queryKey starts with the given string and returns its data.
+    """
+    try:
+        queries = next_data["props"]["pageProps"]["dehydratedState"]["queries"]
+    except (KeyError, TypeError):
+        return None
+    for entry in queries:
+        key = entry.get("queryKey")
+        if key and key[0] == query_key_prefix:
+            return entry.get("state", {}).get("data")
+    return None
+
+
+def _search_pracuj(query: str, location: str | None, country: str, results_per_page: int) -> list[dict]:
+    """Poland-only local job board scrape (SerpApi/Bright-Data-Google-Jobs both
+    confirmed empty for `pl`). pracuj.pl's search-results listing only carries a
+    ~250-char truncated description per job, so each result's own offer page is
+    fetched too, in parallel, for the full sectioned description (technologies,
+    responsibilities, requirements, offer conditions - genuinely richer than a
+    flat text blob, confirmed live).
+    """
+    path = f"/praca/{quote_plus(query)};kw"
+    if location:
+        path += f"/{quote_plus(location)};wp"
+
+    list_html = _fetch_via_bright_data(f"https://www.pracuj.pl{path}")
+    if list_html is None:
+        return []
+
+    next_data = _extract_balanced_json(list_html, '__NEXT_DATA__" type="application/json">')
+    if not next_data:
+        return []
+
+    job_offers_data = _find_react_query_data(next_data, "jobOffers") or {}
+    offer_groups = job_offers_data.get("groupedOffers", [])
+    offer_groups = [g for g in offer_groups if g.get("offers")][: min(results_per_page, LOCAL_BOARD_DETAIL_FETCH_CAP)]
+    if not offer_groups:
+        return []
+
+    def fetch_one(offer_group: dict) -> dict:
+        offer = offer_group["offers"][0]
+        detail_url = offer["offerAbsoluteUri"]
+        description = offer_group.get("jobDescription")
+
+        detail_html = _fetch_via_bright_data(detail_url)
+        if detail_html:
+            detail_data = _extract_balanced_json(detail_html, '__NEXT_DATA__" type="application/json">')
+            job_data = _find_react_query_data(detail_data, "jobOffer") if detail_data else None
+            sections = (job_data or {}).get("textSections") or []
+            full_text = "\n\n".join(section["plainText"] for section in sections if section.get("plainText"))
+            if full_text:
+                description = full_text
+
+        return {
+            "source": "pracuj",
+            "id": str(offer_group.get("groupId", "")),
+            "title": offer_group.get("jobTitle"),
+            "company": offer_group.get("companyName"),
+            "location": offer.get("displayWorkplace"),
+            "description": description,
+            "url": detail_url,
+            "posted_at": offer_group.get("lastPublicated"),
+        }
+
+    with ThreadPoolExecutor(max_workers=min(len(offer_groups), 5)) as executor:
+        return list(executor.map(fetch_one, offer_groups))
+
+
+COUNTRY_JOB_BOARD_SCRAPERS["pl"] = _search_pracuj
+
+
 def _search_bright_data(query: str, location: str | None, country: str, results_per_page: int) -> list[dict]:
     """Fallback for when SerpApi's quota is exhausted. Uses Bright Data's Web
     Unlocker product to fetch Google's Jobs vertical (udm=8) and parses the
@@ -76,27 +292,15 @@ def _search_bright_data(query: str, location: str | None, country: str, results_
     More fragile than SerpApi (tied to Google's current markup) - only used
     as a fallback, not primary, for that reason.
     """
-    api_key = os.environ.get("BRIGHT_DATA_API_KEY")
-    zone = os.environ.get("BRIGHT_DATA_SERP_ZONE")
-    if not api_key or not zone:
-        return []
-
     search_text = f"{query} {location}" if location else query
     target_url = f"https://www.google.com/search?q={quote_plus(search_text)}&gl={country}&hl=en&udm=8"
 
-    try:
-        response = httpx.post(
-            BRIGHT_DATA_REQUEST_URL,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"zone": zone, "url": target_url, "format": "raw"},
-            timeout=90,
-        )
-        response.raise_for_status()
-    except httpx.HTTPError:
+    html = _fetch_via_bright_data(target_url)
+    if html is None:
         return []
 
     try:
-        soup = BeautifulSoup(response.text, "lxml")
+        soup = BeautifulSoup(html, "lxml")
     except Exception:
         return []
 
@@ -196,7 +400,29 @@ def expand_query(query: str) -> list[str]:
     return related_titles
 
 
-def _search_one_term(search_term: str, location: str | None, country: str, results_per_page: int) -> list[dict]:
+def _search_one_term(
+    search_term: str,
+    location: str | None,
+    country: str,
+    results_per_page: int,
+    primary_source: str = "serpapi",
+) -> list[dict]:
+    local_board_scraper = COUNTRY_JOB_BOARD_SCRAPERS.get(country)
+    if local_board_scraper:
+        # Deterministic country-based routing, not a reactive fallback - SerpApi
+        # and Bright Data's Google-Jobs-vertical scrape are both confirmed empty
+        # for these countries, so skip straight to the local board instead of
+        # spending two calls we already know will fail.
+        return local_board_scraper(search_term, location, country, results_per_page)
+
+    if primary_source == "brightdata":
+        # Personalized matching (job_matching_service.py) needs a bigger pool per
+        # request than a one-off manual search, and Bright Data's free tier
+        # (5,000/mo) has far more headroom than SerpApi's (250/mo) - primary/
+        # fallback flipped for that caller only, everything else below unchanged.
+        batch = _search_bright_data(search_term, location, country, results_per_page)
+        return batch if batch else (_search_serpapi(search_term, location, country, results_per_page) or [])
+
     batch = _search_serpapi(search_term, location, country, results_per_page)
     if batch is None:
         # SerpApi quota exhausted or unavailable - fall back to Bright Data.
@@ -223,6 +449,7 @@ def search_jobs(
     country: str = "us",
     results_per_page: int = 10,
     candidate_id: str | None = None,
+    primary_source: str = "serpapi",
 ) -> dict:
     used_query = query.strip()
     recommended = False
@@ -250,7 +477,7 @@ def search_jobs(
     # in parallel).
     with ThreadPoolExecutor(max_workers=len(all_queries)) as executor:
         batches = executor.map(
-            lambda term: _search_one_term(term, location, country, results_per_page), all_queries
+            lambda term: _search_one_term(term, location, country, results_per_page, primary_source), all_queries
         )
 
         seen: set[tuple[str, str]] = set()
