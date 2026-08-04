@@ -38,77 +38,83 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm space-y-6">
-      <h2 className="text-xl font-semibold">Create an account</h2>
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div className="w-full max-w-sm space-y-6 rounded-lg border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h2 className="text-xl font-semibold">Create an account</h2>
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <span className="block text-sm font-medium">I am a...</span>
-          <div className="mt-1 flex gap-2">
-            <button type="button" onClick={() => setRole('recruiter')} className={roleButtonClass(role === 'recruiter')}>
-              Recruiter
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('job_seeker')}
-              className={roleButtonClass(role === 'job_seeker')}
-            >
-              Job seeker
-            </button>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <span className="block text-sm font-medium">I am a...</span>
+            <div className="mt-1 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRole('recruiter')}
+                className={roleButtonClass(role === 'recruiter')}
+              >
+                Recruiter
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('job_seeker')}
+                className={roleButtonClass(role === 'job_seeker')}
+              >
+                Job seeker
+              </button>
+            </div>
           </div>
-        </div>
 
-        <label className="block text-sm font-medium">
-          Name (optional)
-          <input
-            type="text"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-          />
-        </label>
+          <label className="block text-sm font-medium">
+            Name (optional)
+            <input
+              type="text"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+            />
+          </label>
 
-        <label className="block text-sm font-medium">
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-          />
-        </label>
+          <label className="block text-sm font-medium">
+            Email
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+            />
+          </label>
 
-        <label className="block text-sm font-medium">
-          Password
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-          />
-          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">At least 8 characters.</span>
-        </label>
+          <label className="block text-sm font-medium">
+            Password
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+            />
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">At least 8 characters.</span>
+          </label>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSubmitting ? 'Creating account…' : 'Create account'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSubmitting ? 'Creating account…' : 'Create account'}
+          </button>
+        </form>
 
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Already have an account?{' '}
-        <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-          Log in
-        </Link>
-      </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Already have an account?{' '}
+          <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+            Log in
+          </Link>
+        </p>
+      </div>
     </div>
   )
 }

@@ -74,7 +74,10 @@ function AuthNav() {
   return (
     <div className="flex items-center gap-2">
       {user.role !== 'job_seeker' && (
-        <span className="hidden text-gray-500 dark:text-gray-400 sm:inline">
+        <span
+          className="hidden max-w-[10rem] truncate text-gray-500 dark:text-gray-400 sm:inline"
+          title={user.display_name || user.email}
+        >
           {user.display_name || user.email}
         </span>
       )}
@@ -105,7 +108,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <nav className="flex items-center gap-2 text-sm">
             {(!user || user.role === 'recruiter') && (
               <>
-                <NavLink to="/recruiter" className={navLinkClass}>
+                <NavLink to="/recruiter" end className={navLinkClass}>
                   Recruiter Dashboard
                 </NavLink>
                 <NavLink to="/recruiter/shortlists" className={navLinkClass}>
@@ -124,8 +127,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 <NavLink to="/job-seeker/my-jobs" className={navLinkClass}>
                   My Jobs
                 </NavLink>
-                <NavLink to="/job-seeker/profile" className={navLinkClass}>
-                  {user ? user.display_name || user.email : 'Profile'}
+                <NavLink
+                  to="/job-seeker/profile"
+                  className={navLinkClass}
+                  title={user ? user.display_name || user.email : undefined}
+                >
+                  <span className="inline-block max-w-[10rem] truncate align-bottom">
+                    {user ? user.display_name || user.email : 'Profile'}
+                  </span>
                 </NavLink>
               </>
             )}
