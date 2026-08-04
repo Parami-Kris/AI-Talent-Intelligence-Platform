@@ -73,7 +73,9 @@ Reason:
 - useful for recruiter-facing product persistence
 - easier to explain confidently in interviews
 
-Hosting: Aiven (production, current HF Space secrets) — being migrated to **TiDB Cloud Starter** (MySQL-compatible, no code changes needed) because Aiven's free tier auto-powers-off after a period of inactivity, which would hard-fail the app's persistence layer (rankings, pipeline review flow) if someone opens the deployed app while the DB is asleep. Schema is already created and verified working on TiDB (`ai-screening-db`); production secrets haven't been switched over yet. TiDB's own inactivity behavior isn't fully confirmed by docs (no documented auto-delete/pause policy found for the Starter tier, unlike Aiven's explicitly documented one) — worth revisiting after a few days of real-world idle time to confirm.
+Hosting: **TiDB Cloud Serverless** (production, `ai_resume_screening` database) — migrated from Aiven 2026-07-15, because Aiven's free tier auto-powers-off after a period of inactivity, which would hard-fail the app's persistence layer (rankings, pipeline review flow) if someone opens the deployed app while the DB is asleep. HF Space secrets (`MYSQL_HOST`/`PORT`/`USER`/`PASSWORD`/`DATABASE`) point at TiDB. `render.yaml`/Aiven are fully retired.
+
+**(Caught and fixed 2026-08-04)** The auth-era schema (`users`, `candidate_comments`, `job_seeker_profiles`, plus `owner_id`/`is_shortlisted`/`email_normalized`/`phone_normalized` columns on existing tables) had only ever been applied locally — production TiDB was still on the pre-auth schema, meaning login/recruiter accounts/job-seeker accounts were non-functional in production despite being fully built and tested. `setup_mysql.py` can't safely fix this itself (see its gotcha below: `CREATE TABLE IF NOT EXISTS` doesn't retroactively add columns/tables to an existing DB), so the full migration was applied by hand, in dependency order, directly against prod. Verified via a live `SHOW TABLES`/`DESCRIBE` check afterward — all tables, columns, indexes, and the `job_match_usage` FK are now present and correct.
 
 Not chosen for now:
 
@@ -398,17 +400,24 @@ Implemented:
 - `backend/app/services/input_service.py`
 - `backend/app/services/resume_intake_service.py`
 
-Current capabilities:
+Current capabilities (30 routes total):
 
 - `GET /health`
+- `POST /auth/register`, `POST /auth/login`, `GET /auth/me` (JWT-based recruiter/job-seeker accounts, see Authentication section below)
 - `POST /rank-candidates` (batch ranking over pre-parsed JSON)
 - `POST /rerank-shortlist` (LLM shortlist reranking)
+- `GET /jobs/search`, `POST /jobs/events`, `GET /jobs/my-jobs`, `DELETE /jobs/events` (job seeker "search real jobs" feature + activity history — SerpApi/Bright Data primary, plus country-specific local job board scraping for SerpApi-unsupported countries; see below)
 - `POST /analyze-profile-gap` (job seeker qualification-gap analysis)
+- `POST /tailor-resume` (LLM resume tailoring for a specific job, see below)
 - `POST /save-rankings` (persist a ranking payload to MySQL)
 - `POST /upload/rank-candidates` (multipart upload: one JD file + multiple resume files, parses each via Docling/Gemini, ranks the batch, and reports per-resume parse failures without stopping the batch)
+- `POST /upload/parse-jd`, `POST /upload/parse-resume`, `POST /upload/parse`, `POST /upload/parse/start`, `GET /upload/parse/status/{job_id}` (single-document parsing, sync and background-tracked)
 - `POST /pipeline/run` / `POST /pipeline/resume` (LangGraph human-in-the-loop pipeline, see above)
-- `GET /jobs/search` (job seeker "search real jobs" feature — SerpApi primary, Bright Data Web Unlocker fallback, Groq-based related-title query expansion; see below)
-- every route now declares a Pydantic `response_model` (`backend/app/schemas/ranking.py`, `backend/app/schemas/pipeline.py`), not plain dicts
+- `GET /runs`, `GET /runs/{run_id}`, `PATCH /runs/{run_id}/candidates/{candidate_id}/shortlist` (recruiter shortlist history, multi-tenant — scoped to the authenticated recruiter's own `owner_id`)
+- `GET /candidates/{candidate_id}/comments`, `POST /candidates/{candidate_id}/comments` (recruiter candidate comments with an explicit caution flag)
+- `GET /job-seeker/resume`, `PUT /job-seeker/resume` (saved resume, backs the Profile page)
+- `GET /job-seeker/matches` (personalized job matches — LLM match-scoring against the saved resume, see below)
+- every route declares a Pydantic `response_model` (`backend/app/schemas/`), not plain dicts
 
 ### Job search (job seeker "search real jobs")
 
@@ -424,6 +433,40 @@ Current capabilities:
 - searches SerpApi's Google Jobs engine first (full descriptions, direct apply links); automatically falls back to Bright Data (Web Unlocker product, HTML-parsed) if SerpApi fails or its free-tier quota (250/month) is exhausted — Bright Data also returns full descriptions once you know the right target (`udm=8` jobs-vertical param, not the deprecated `ibp=htl;jobs`)
 - Groq generates up to 3 related job titles per query (e.g. "ML Engineer" also searches "Applied Scientist") and fans out the search across all of them, merging/deduping results; expansions are cached in a MySQL `query_expansions` table so repeat searches don't re-call Groq
 - rejected sources, documented so they aren't re-investigated: Adzuna/Jooble (hard ~300-500 char description truncation, no API-level fix), Remotive (full descriptions but remote-jobs-only, dropped for narrower coverage), LinkedIn scraping including Bright Data's own LinkedIn dataset product (declined — ToS/legal risk), JobsPipe (worse free tier than SerpApi, requires a card)
+- **(Added 2026-08-04) Country-specific local job board scraping**: SerpApi's `google_jobs` engine rejects Ireland/Australia/New Zealand/Poland outright, and Bright Data's Google-Jobs-vertical scrape is also confirmed empty for those markets — `COUNTRY_JOB_BOARD_SCRAPERS` in `job_search_service.py` routes those four straight to the locally-dominant board instead (Indeed's own country sites for ie/au/nz, pracuj.pl for pl), scraped directly via the same Bright Data Web Unlocker zone, for full (not snippet-truncated) descriptions. SEEK was evaluated for au/nz but rejected — its `robots.txt` disallows `*/job/*`, which Bright Data's standard access tier respects and blocks, so it can't return full descriptions without upgraded account access; Indeed already covers those markets too, so it's reused as-is instead of a SEEK-specific scraper.
+
+### Authentication and multi-tenancy
+
+Implemented:
+
+- `backend/app/auth_service.py` (JWT via PyJWT + bcrypt), `backend/app/schemas/auth.py`, `users` table (`role` is `recruiter` or `job_seeker`, one persona per account)
+- `POST /auth/register`, `POST /auth/login`, `GET /auth/me`; `require_role` dependency gates recruiter-only and job-seeker-only routes
+- Individual-account tenancy: a recruiter's `screening_runs`/`pipeline_reviews` are scoped to their own `owner_id`, not shared with other recruiters even when they screen the same candidate (`candidates` stays a global table, matched by email — see its schema comment)
+- IDOR fix: job-seeker `candidate_id` (the localStorage-generated job-search identity) is validated against the authenticated account rather than trusted as a client-supplied value
+
+### Recruiter shortlist history and candidate comments
+
+Implemented:
+
+- `GET /runs`, `GET /runs/{run_id}`, `PATCH /runs/{run_id}/candidates/{candidate_id}/shortlist` — "My Shortlists" history, scoped to the recruiter's own `owner_id`
+- `candidate_comments` table + `GET`/`POST /candidates/{candidate_id}/comments` — free-text notes scoped to `author_id`, plus an explicit `is_caution` checkbox (the LLM also reasons over comment text for caution signals, but the checkbox guarantees a flag surfaces even when phrasing is ambiguous)
+
+### Job seeker saved resume, profile page, and job history
+
+Implemented:
+
+- `job_seeker_profiles` table, `GET`/`PUT /job-seeker/resume`
+- `web-app/src/features/job-seeker/ProfilePage.tsx` — explicit save/manage flow for a job seeker's resume (nav link shows the user's name once logged in), separate from the implicit background-save `ProfileGapForm.tsx` already had
+- `web-app/src/features/job-seeker/MyJobsPage.tsx` — liked/applied job history with an explicit "did you apply?" confirmation (can't detect a real application, only a click-through), plus the ability to clear history
+
+### Resume tailoring and personalized job matches
+
+Implemented:
+
+- `backend/app/services/llm_provider.py` — shared Mistral-primary/Groq-fallback JSON chat helper (`mistral-small-2506` pinned to the exact snapshot; the newer `-2603` snapshot has a 20x lower free-tier TPM ceiling on the same account)
+- `backend/app/services/resume_tailoring_service.py` + `POST /tailor-resume` — rewrites summary/experience emphasis for a specific job, grounded in the existing deterministic gap analysis so it can't fabricate experience; also surfaces skills genuinely demonstrated in experience/projects prose but missing from the skills section (contextual read, not keyword matching — e.g. "built REST APIs with Flask" surfaces Flask even if "Flask" never appears in the skills list)
+- `backend/app/services/job_matching_service.py` + `GET /job-seeker/matches` — scores a pooled job search against the user's saved resume with match%, sorted best-first; `job_match_usage` table enforces a per-user daily quota (default 100/day, `JOB_MATCH_DAILY_LIMIT` env var) since Mistral/Groq quotas are shared org-wide, not per-user
+- `web-app/src/features/job-seeker/MatchesPage.tsx`, `TailorResumePanel.tsx` — job-seeker-only nav section; each matched job shows "Tailor my resume" rather than the full gap-analysis flow, since the match% already substitutes for it
 
 ### Malformed LLM JSON handling
 
@@ -445,9 +488,9 @@ Implemented:
 
 ## Current Completion Estimate
 
-Approximate status: 85-90%.
+Approximate status: 90-95%.
 
-The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline with a relative-score fallback so a strict all-must-haves gate doesn't dead-end real batches), a FastAPI backend with typed request/response schemas, malformed-LLM-JSON handling, background-threaded resume parsing with live progress tracking, persistence now on TiDB Cloud (production-stable, no more Aiven auto-sleep risk), a synthetic benchmark suite backing the ranking-quality claims plus a labeled LLM judgment-quality benchmark (education-match/experience-relevance scored against the live model, 8/8 agreement with human labels), local reproducibility via `docker-compose.yml`, and the recruiter dashboard (including candidate comparison and CSV export), job seeker qualification-gap dashboard, and job seeker "search real jobs" feature all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces). It is not yet a complete product — remaining gaps are UI polish and demo assets, not core functionality.
+The project has a working AI pipeline prototype (including a LangGraph-orchestrated, human-in-the-loop pipeline with a relative-score fallback so a strict all-must-haves gate doesn't dead-end real batches), a FastAPI backend with typed request/response schemas and JWT-based recruiter/job-seeker authentication with multi-tenant scoping, malformed-LLM-JSON handling, background-threaded resume parsing with live progress tracking, persistence on TiDB Cloud (production-stable, full auth-era schema confirmed applied 2026-08-04), a synthetic benchmark suite backing the ranking-quality claims plus a labeled LLM judgment-quality benchmark (education-match/experience-relevance scored against the live model, 8/8 agreement with human labels), local reproducibility via `docker-compose.yml`, and — all live in `web-app/` (deployed to GitHub Pages, backend on Hugging Face Spaces) — the recruiter dashboard (candidate comparison, CSV export, shortlist history, candidate comments), the job seeker dashboard (qualification-gap analysis, resume tailoring, personalized job matches with LLM scoring, saved-resume profile page, "search real jobs" with country-specific full-description scraping for markets SerpApi/Google don't cover, and liked/applied job history). It is not yet a complete product — remaining gaps are UI polish and demo assets, not core functionality.
 
 Major missing pieces:
 
@@ -460,6 +503,7 @@ Major missing pieces:
 - (Resolved) The LangGraph pipeline's resume step used to depend on an in-memory checkpointer that wouldn't survive a process restart. Fixed via a durable `pipeline_reviews` MySQL table — see the LangGraph section above.
 - (Resolved) Render's free tier couldn't run the backend — Docling's dependency chain (`torch`/`transformers`/`docling-ibm-models`) is too heavy for its 512MB RAM / 0.1 CPU, causing either OOM kills or startup timeouts. Moved backend hosting to Hugging Face Spaces (Docker SDK), which has much more headroom on its free CPU tier.
 - (Resolved 2026-07-15) Aiven's free-tier MySQL auto-powered-off after inactivity, which would hard-fail the app's core persistence if hit while asleep. Migrated production to TiDB Cloud Serverless (verified via a direct connection: schema present, all 6 tables match `backend/schema.sql`; HF Space secrets `MYSQL_HOST`/`PORT`/`USER`/`PASSWORD`/`DATABASE` all updated to point at it, `MYSQL_DATABASE=ai_resume_screening`).
+- (Resolved 2026-08-04) Production TiDB was still on the pre-auth schema — `users` and every table/column added since (`candidate_comments`, `job_seeker_profiles`, `owner_id`/`is_shortlisted`/`email_normalized`/`phone_normalized`, `job_match_usage`) had only ever been applied locally, so recruiter/job-seeker login was non-functional in production despite being fully built and tested. Applied the full migration by hand, in dependency order, directly against prod TiDB; verified via a live schema check afterward. See the Database section above for the full story and the "new table on an existing prod DB" gotcha that caused it.
 
 ## Next Engineering Tasks
 
@@ -568,7 +612,7 @@ Deliberately not done (would be redundant, not deferred-for-later):
 
 ## Near-Term Priority
 
-Phases 1-6 are done, plus the production DB migration to TiDB. What's left is lower-stakes polish rather than core product gaps:
+Phases 1-6 are done, plus the production DB migration to TiDB (including the full auth-era schema, confirmed applied 2026-08-04), authentication/multi-tenancy, recruiter shortlist history and comments, and the job seeker resume-tailoring/personalized-matches/profile-page/country-scraping features. What's left is lower-stakes polish rather than core product gaps:
 
 > UI/UX polish and demo assets. Phase 5 (RAG/embeddings) remains explicitly deferred with no concrete need identified yet.
 
