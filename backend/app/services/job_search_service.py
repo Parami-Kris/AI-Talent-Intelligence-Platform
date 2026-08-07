@@ -314,6 +314,10 @@ def _search_bright_data(query: str, location: str | None, country: str, results_
         description = _strip_tag_html(str(description_span))
         if continuation_span:
             description += _strip_tag_html(str(continuation_span))
+        # <br> runs in Google's markup become \n runs here - collapse to a
+        # single blank line, matching the normalization the other source's
+        # detail-page path already does.
+        description = re.sub(r"\n{3,}", "\n\n", description).strip()
 
         outer_card = detail_card.parent
         meta_div = outer_card.find("div", class_="aW97bd") if outer_card else None

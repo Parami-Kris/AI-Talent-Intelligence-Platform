@@ -147,7 +147,9 @@ export function MatchesPage() {
       )}
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      {isSearching && <LoadingSpinner label="Scoring jobs against your resume…" />}
+      {isSearching && (
+        <LoadingSpinner label="Scoring jobs against your resume… this usually takes 30-60 seconds." />
+      )}
 
       {results && !isSearching && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
