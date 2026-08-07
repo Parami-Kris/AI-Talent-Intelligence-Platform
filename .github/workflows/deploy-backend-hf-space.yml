@@ -25,7 +25,7 @@ jobs:
       - name: Move binary files to LFS for the Space push
         run: |
           git lfs install
-          git lfs migrate import --include="Parami_Resume.pdf" --everything
+          git lfs migrate import --include="*.pdf,*.png,*.jpg,*.jpeg,*.gif,*.ico,*.woff,*.woff2,*.ttf,*.eot" --everything
 
       - name: Push to Hugging Face Space
         env:
