@@ -3,10 +3,14 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # libgl1/libglib2.0-0: common runtime deps for Docling's image-processing backends
-# (opencv-headless etc.) on Debian slim images.
+# (opencv-headless etc.) on Debian slim images. g++: Docling's layout model runs
+# through torch.compile, whose CPU inductor backend JIT-compiles kernels with a
+# real C++ compiler at runtime - without it, conversion fails with
+# InvalidCxxCompiler even though nothing here calls a compiler directly.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
