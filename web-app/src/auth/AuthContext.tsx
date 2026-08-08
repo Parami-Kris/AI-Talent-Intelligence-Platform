@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { AUTH_TOKEN_KEY } from '../api/client'
+import { ApiError, AUTH_TOKEN_KEY } from '../api/client'
 import { getMe, login as loginRequest, register as registerRequest } from '../api/endpoints'
 import type { User, UserRole } from '../api/types'
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 interface AuthContextValue {
   user: User | null
@@ -22,10 +26,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false)
       return
     }
-    getMe()
-      .then(setUser)
-      .catch(() => localStorage.removeItem(AUTH_TOKEN_KEY))
-      .finally(() => setIsLoading(false))
+
+    let cancelled = false
+
+    async function verifySession() {
+      // Only a 401 means the token itself is actually invalid/expired - that's
+      // the one case worth clearing it and sending the user back to /login.
+      // Anything else (network blip, a slow/momentarily-erroring backend) is
+      // transient and shouldn't sign someone out of a session that's still
+      // genuinely valid - one retry rides out most of those before giving up.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const me = await getMe()
+          if (!cancelled) setUser(me)
+          return
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) {
+            localStorage.removeItem(AUTH_TOKEN_KEY)
+            return
+          }
+          if (attempt === 0) await sleep(1500)
+        }
+      }
+      // Kept the token so the next reload (or this session recovering) can
+      // still pick the session back up instead of forcing a fresh login.
+    }
+
+    verifySession().finally(() => {
+      if (!cancelled) setIsLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function login(email: string, password: string) {
