@@ -69,29 +69,37 @@ def get_my_jobs(candidate_id):
     """Distinct jobs the candidate has liked/applied to, most-recent occurrence
     per job (a candidate can like or view the same job more than once across
     searches). Returns {"liked": [...], "applied": [...]}, each newest-first.
+
+    Both event types are fetched in a single round trip (partitioned/deduped
+    per event_type in one query) rather than two separate queries - each
+    round trip to TiDB carries enough fixed latency on its own that halving
+    the count matters more here than the query itself getting marginally
+    more complex.
     """
     query = """
-        SELECT job_source, job_external_id, job_title, company, location, job_url, created_at
+        SELECT job_source, job_external_id, job_title, company, location, job_url, created_at, event_type
         FROM (
             SELECT
-                job_source, job_external_id, job_title, company, location, job_url, created_at,
+                job_source, job_external_id, job_title, company, location, job_url, created_at, event_type,
                 ROW_NUMBER() OVER (
-                    PARTITION BY job_source, job_external_id
+                    PARTITION BY event_type, job_source, job_external_id
                     ORDER BY created_at DESC
                 ) AS rn
             FROM candidate_job_events
-            WHERE candidate_id = %s AND event_type = %s
+            WHERE candidate_id = %s AND event_type IN ('liked', 'applied')
         ) deduped
         WHERE rn = 1
         ORDER BY created_at DESC
     """
-    result = {}
     with get_connection() as connection:
         cursor = connection.cursor()
-        for event_type in ("liked", "applied"):
-            cursor.execute(query, (candidate_id, event_type))
-            result[event_type] = shape_my_jobs_rows(cursor.fetchall())
-    return result
+        cursor.execute(query, (candidate_id,))
+        rows = cursor.fetchall()
+
+    return {
+        event_type: shape_my_jobs_rows([row[:7] for row in rows if row[7] == event_type])
+        for event_type in ("liked", "applied")
+    }
 
 
 def pick_best_title(rows):
